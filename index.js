@@ -114,7 +114,9 @@ async function handleImage(replyToken, messageId) {
 async function handleQuestion(replyToken, question) {
   try {
     // ดึงข้อมูลสต็อกทั้งหมด
-    const { data: stock } = await supabase.from('stock').select('*');
+    const { data: stock, error } = await supabase.from('stock').select('*');
+console.log('stock data:', stock);
+console.log('stock error:', error);
     const stockText = (stock || []).map(s =>
       `รหัส ${s.color_code} (${s.color_name}): เหลือ ${s.quantity_remaining} ม้วน`
     ).join('\n');
