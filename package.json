@@ -1,0 +1,30 @@
+{
+  "name": "donnabottest",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/prawattana/DonnaBotTest.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/prawattana/DonnaBotTest/issues"
+  },
+  "homepage": "https://github.com/prawattana/DonnaBotTest#readme",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.92.0",
+    "@line/bot-sdk": "^11.0.0",
+    "@supabase/supabase-js": "^2.105.1",
+    "axios": "^1.15.2",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "googleapis": "^171.4.0"
+  }
+}
