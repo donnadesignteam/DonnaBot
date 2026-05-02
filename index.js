@@ -115,7 +115,7 @@ async function handleQuestion(replyToken, question) {
   try {
     // ดึงข้อมูลสต็อกทั้งหมด
     const { data: stock } = await supabase.from('stock').select('*');
-    const stockText = stock.map(s =>
+    const stockText = (stock || []).map(s =>
       `รหัส ${s.color_code} (${s.color_name}): เหลือ ${s.quantity_remaining} ม้วน`
     ).join('\n');
 
