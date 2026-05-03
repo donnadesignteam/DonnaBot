@@ -82,7 +82,8 @@ async function handleImage(replyToken, messageId) {
     });
 
     const raw = response.content[0].text;
-    const data = JSON.parse(raw);
+    const cleaned = raw.replace(/```json|```/g, '').trim();
+const data = JSON.parse(cleaned);
 
     // อัปโหลดรูปไป Supabase Storage
     const compressedBuffer = await sharp(imageBuffer)
