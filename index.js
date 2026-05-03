@@ -65,7 +65,7 @@ async function handleImage(replyToken, messageId) {
     // ส่งให้ Claude อ่าน
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 500,
+      max_tokens: 1500,
       messages: [{
         role: 'user',
         content: [
@@ -82,7 +82,8 @@ async function handleImage(replyToken, messageId) {
     });
 
     const raw = response.content[0].text;
-    const cleaned = raw.replace(/```json|```/g, '').trim();
+console.log('Claude raw response:', raw);
+const cleaned = raw.replace(/```json|```/g, '').trim();
 const data = JSON.parse(cleaned);
 
     // อัปโหลดรูปไป Supabase Storage
@@ -150,7 +151,7 @@ console.log('stock error:', error);
 
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 500,
+      max_tokens: 1500,
       messages: [{
         role: 'user',
         content: `ข้อมูลสต็อกผ้าม่านปัจจุบัน:\n${stockText}\n\nคำถาม: ${question}\n\nตอบเป็นภาษาไทยสั้นๆ กระชับ`,
