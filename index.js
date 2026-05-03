@@ -53,13 +53,13 @@ async function handleEvent(event) {
 async function handleImage(replyToken, messageId) {
   try {
     // ดึงภาพจาก LINE
-    const response = await fetch(`https://api-data.line.me/v2/bot/message/${messageId}/content`, {
+    const lineResponse = await fetch(`https://api-data.line.me/v2/bot/message/${messageId}/content`, {
   headers: {
     Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`
   }
 });
-const arrayBuffer = await response.arrayBuffer();
-const imageBuffer = Buffer.from(arrayBuffer);
+    const arrayBuffer = await lineResponse.arrayBuffer();
+    const imageBuffer = Buffer.from(arrayBuffer);
     const base64Image = imageBuffer.toString('base64');
 
     // ส่งให้ Claude อ่าน
