@@ -3,7 +3,7 @@ const express = require('express');
 const line = require('@line/bot-sdk');
 const Anthropic = require('@anthropic-ai/sdk');
 const { createClient } = require('@supabase/supabase-js');
-
+const sharp = require('sharp');
 const app = express();
 
 // Config
@@ -82,10 +82,15 @@ async function handleImage(replyToken, messageId) {
     const data = JSON.parse(raw);
 
     // อัปโหลดรูปไป Supabase Storage
-    const fileName = `${Date.now()}.jpg`;
-    await supabase.storage.from('order-images').upload(fileName, imageBuffer, {
-      contentType: 'image/jpeg',
-    });
+    const compressedBuffer = await sharp(imageBuffer)
+  .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+  .jpeg({ quality: 70 })
+  .toBuffer();
+
+const fileName = `${Date.now()}.jpg`;
+await supabase.storage.from('order-images').upload(fileName, compressedBuffer, {
+  contentType: 'image/jpeg',
+});
     const { data: urlData } = supabase.storage.from('order-images').getPublicUrl(fileName);
     data.image_url = urlData.publicUrl;
 
