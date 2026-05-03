@@ -100,9 +100,13 @@ const data = JSON.parse(cleaned);
   .toBuffer();
 
 const fileName = `${Date.now()}.jpg`;
-await supabase.storage.from('order-images').upload(fileName, compressedBuffer, {
-  contentType: 'image/jpeg',
-});
+const { data: uploadData, error: uploadError } = await supabase.storage
+  .from('order-images')
+  .upload(fileName, compressedBuffer, {
+    contentType: 'image/jpeg',
+  });
+console.log('upload data:', uploadData);
+console.log('upload error:', uploadError);
     const { data: urlData } = supabase.storage.from('order-images').getPublicUrl(fileName);
     data.image_url = urlData.publicUrl;
 
