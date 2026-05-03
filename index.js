@@ -75,39 +75,7 @@ async function handleImage(replyToken, messageId) {
           },
           {
             type: 'text',
-            text: `อ่านข้อมูลจากใบงานนี้แล้วตอบเป็น JSON เท่านั้น ไม่ต้องมีข้อความอื่น
-รูปแบบ: {
-  "order_number":"",
-  "customer_name":"",
-  "platform":"",
-  "order_date":"",
-  "technician":"",
-  "note":"",
-  "items":[{
-    "curtain_type":"",
-    "color_code":"",
-    "color_name":"",
-    "eye_color":"",
-    "width":0,
-    "height":0,
-    "quantity":0,
-    "unit":"ผืน"
-  }]
-}
-หมายเหตุสำคัญ:
-- order_number คือเลข ID ลูกค้าหลังชื่อ platform เช่น shopee: lookmee180158 ให้ใส่ lookmee180158
-- customer_name คือชื่อคนสั่งซื้อส่วนใหญ่จะอยู่หลังช่องทาง ถ้าไม่มีให้ใส่ช่องว่าง ให้อ่านชื่อให้ครบที่สุดเท่าที่เห็น แม้จะเห็นแค่บางส่วน
-- platform คือช่องทาง เช่น Tiktok, Shopee, Facebook, LineOA, Lazada
-- order_date คือวันที่ในใบงาน ถ้าปีไม่ชัดเจนให้ใช้ปี 2026
-- technician คือชื่อช่างที่เขียนไว้ในใบ ถ้าไม่มีใส่ค่าว่าง
-- note คือหมายเหตุพิเศษ ถ้าไม่มีใส่ค่าว่าง
-- items ให้แยกทุกรายการที่เห็นในใบงาน แต่ละสีหรือแต่ละประเภทเป็น 1 item
-- curtain_type คือประเภท เช่น ม่านตาไก่, รางตาไก่, ม่านซ่อนหู, ผ้าโปร่ง
-- color_code คือรหัสสี เช่น S05, S18, HB81
-- color_name คือชื่อสี เช่น เทาเบจ, เทาเมฆ
-- eye_color คือสีตาไก่ เช่น ตาไก่สีขาว, ตาไก่สีดำ ถ้าไม่มีใส่ค่าว่าง
-- width และ height อ่านเป็นเมตร เช่น ก1.30 = 1.30
-- unit คือหน่วย เช่น ผืน หรือ ชุด`,
+            text: 'อ่านข้อมูลจากใบงานแล้วตอบเป็น JSON เท่านั้น ห้ามมี markdown หรือข้อความอื่น ใช้รูปแบบ {"order_number":"","customer_name":"","platform":"","order_date":"","technician":"","note":"","items":[{"curtain_type":"","color_code":"","color_name":"","eye_color":"","width":0,"height":0,"quantity":0,"unit":"ผืน"}]} โดย order_number=เลข ID ลูกค้าหลัง platform เช่น shopee:lookmee180158 ให้ใส่ lookmee180158, customer_name=เลขออเดอร์ยาวๆ ให้อ่านให้ครบที่สุดเท่าที่เห็น, platform=Tiktok/Shopee/Facebook/LineOA/Lazada, order_date=วันที่ในใบ ถ้าปีไม่ชัดใช้ 2026, items=แยกทุกรายการแต่ละสีหรือประเภทเป็น 1 item, curtain_type=ม่านตาไก่/รางตาไก่/ม่านซ่อนหู/ผ้าโปร่ง, width และ height อ่านเป็นเมตร เช่น ก1.30=1.30, unit=ผืนหรือชุด, eye_color=สีตาไก่ถ้ามีไม่มีใส่ว่าง',
           },
         ],
       }],
