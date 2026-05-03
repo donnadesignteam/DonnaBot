@@ -75,7 +75,7 @@ async function handleImage(replyToken, messageId) {
           },
           {
             type: 'text',
-            text: 'อ่านข้อมูลจากใบงานแล้วตอบเป็น JSON เท่านั้น ห้ามมี markdown หรือข้อความอื่น ใช้รูปแบบ {"order_number":"","customer_name":"","platform":"","order_date":"","technician":"","note":"","items":[{"curtain_type":"","color_code":"","color_name":"","eye_color":"","width":0,"height":0,"quantity":0,"unit":"ผืน"}]} โดย order_number=เลข ID ลูกค้าหลัง platform เช่น shopee:lookmee180158 ให้ใส่ lookmee180158, customer_name=เลขออเดอร์ยาวๆ ให้อ่านให้ครบที่สุดเท่าที่เห็น, platform=Tiktok/Shopee/Facebook/LineOA/Lazada, order_date=วันที่ในใบ ถ้าปีไม่ชัดใช้ 2026, items=แยกทุกรายการแต่ละสีหรือประเภทเป็น 1 item, curtain_type=ม่านตาไก่/รางม่านตาไก่/ม่านซ่อนหู/ผ้าโปร่ง, color_name ให้อ่านชื่อสีให้ถูกต้อง เช่น เทาเบจ เทาเมฆ ขาวครีม ไม่ใช่ทาเบจหรือทาเมชุ, eye_color=สีตาไก่เช่นสีขาวสีดำถ้าไม่มีใส่ว่าง, width และ height อ่านเป็นเมตร เช่น ก1.30=1.30 ถ้าเป็นรางให้ใส่แค่ width ส่วน height ใส่ 0, unit=ผืนหรือชุด',
+            text: 'อ่านข้อมูลจากใบงานแล้วตอบเป็น JSON เท่านั้น ห้ามมี markdown หรือข้อความอื่น ใช้รูปแบบ {"order_number":"","customer_name":"","platform":"","order_date":"","technician":"","note":"","items":[{"curtain_type":"","color_code":"","color_name":"","eye_color":"","width":0,"height":0,"quantity":0,"unit":"ผืน"}]} โดย order_number=เลข ID ลูกค้าหลัง platform, customer_name=เลขออเดอร์ยาวๆ, platform=Tiktok/Shopee/Facebook/LineOA/Lazada, order_date=วันที่ในใบ ถ้าปีไม่ชัดใช้ 2026, items=แยกทุกรายการแต่ละสีหรือประเภทเป็น 1 item, curtain_type=ม่านตาไก่/ม่านซ่อนหู/ผ้าโปร่ง ถ้าเป็นรางให้ใส่ curtain_type=รางม่าน, color_name อ่านให้ถูกต้องเช่นเทาเบจ เทาเมฆ ขาวครีม, eye_color=สีตาไก่เช่นสีขาวสีดำถ้าไม่มีใส่ว่าง, ถ้าเป็นรางให้ใส่ width=ความยาวราง height=0 เท่านั้น ถ้าเป็นม่านให้ใส่ width=กว้าง height=สูง อ่านเป็นเมตร เช่น ก1.30=1.30, unit=ผืนหรือชุด',
           },
         ],
       }],
@@ -108,9 +108,10 @@ console.log('upload error:', uploadError);
 
     // ตอบกลับ LINE
     const itemsText = data.items.map(i => {
-  const size = i.height > 0 ? `${i.width}*${i.height}` : `${i.width}`;
+  const isRang = i.curtain_type.includes('ราง');
+  const size = isRang ? `${i.width}` : `${i.width}*${i.height}`;
   const eye = i.eye_color ? `${i.eye_color} ` : '';
-  return `  ${i.curtain_type}${eye}${i.color_code} ${i.color_name} ${size} = ${i.quantity} ${i.unit}`;
+  return `  ${i.curtain_type} ${eye}${i.color_code} ${i.color_name} ${size} = ${i.quantity} ${i.unit}`;
 }).join('\n');
 
 await client.replyMessage({
