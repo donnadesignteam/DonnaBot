@@ -75,11 +75,13 @@ async function handleImage(replyToken, messageId) {
           },
           {
             text: `อ่านข้อมูลจากใบงานนี้แล้วตอบเป็น JSON เท่านั้น ไม่ต้องมีข้อความอื่น
-รูปแบบ: {"order_number":"","customer_name":"","color_code":"","width":0,"height":0,"technician":""}
+รูปแบบ: {"order_number":"","customer_name":"","color_code":"","width":0,"height":0,"quantity":0,"order_date":"","technician":""}
 หมายเหตุสำคัญ:
-- order_number ให้เก็บทุกเลขออเดอร์ที่เห็นในใบงาน คั่นด้วย comma เช่น "2604306HEWXQ1E,2604306HTTF8P6"
-- customer_name ให้อ่านชื่อลูกค้าหรือชื่อร้านที่เห็นในใบงาน เช่น shopee : chomchinda ให้ใส่ว่า chomchinda
+- order_number ให้เก็บทุกเลขออเดอร์ที่เห็นในใบงาน คั่นด้วย comma
+- customer_name ให้อ่านชื่อลูกค้าหรือชื่อร้านที่เห็นในใบงาน
 - width และ height ให้อ่านเป็นเมตรจริงๆ เช่น ก1.30 แปลว่า width = 1.30 ไม่ใช่ 30
+- quantity คือจำนวนผืน เช่น 2 ผืน ให้ใส่ 2
+- order_date คือวันที่ในใบงาน เช่น 30 เม.ย. 2026
 - ถ้าไม่มีชื่อช่าง ให้ใส่ technician เป็นค่าว่าง`,
           },
         ],
@@ -111,7 +113,7 @@ await supabase.storage.from('order-images').upload(fileName, compressedBuffer, {
       replyToken,
       messages: [{
         type: 'text',
-        text: `✅ บันทึกแล้วครับ\nลูกค้า: ${data.customer_name}\nออเดอร์: ${data.order_number}\nสี: ${data.color_code}\nขนาด: ${data.width} x ${data.height} ม.`,
+        text: `✅ บันทึกแล้วครับ\nวันที่: ${data.order_date}\nลูกค้า: ${data.customer_name}\nออเดอร์: ${data.order_number}\nสี: ${data.color_code}\nขนาด: ${data.width} x ${data.height} ม.\nจำนวน: ${data.quantity} ผืน`,
       }],
     });
 
