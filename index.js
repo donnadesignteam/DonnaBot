@@ -64,7 +64,7 @@ async function handleImage(replyToken, messageId) {
 
     // ส่งให้ Claude อ่าน
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 500,
       messages: [{
         role: 'user',
@@ -74,6 +74,7 @@ async function handleImage(replyToken, messageId) {
             source: { type: 'base64', media_type: 'image/jpeg', data: base64Image },
           },
           {
+            type: 'text',
             text: `อ่านข้อมูลจากใบงานนี้แล้วตอบเป็น JSON เท่านั้น ไม่ต้องมีข้อความอื่น
 รูปแบบ: {"order_number":"","customer_name":"","color_code":"","width":0,"height":0,"quantity":0,"order_date":"","technician":""}
 หมายเหตุสำคัญ:
