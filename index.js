@@ -76,14 +76,16 @@ async function handleImage(replyToken, messageId) {
           {
             type: 'text',
             text: `อ่านข้อมูลจากใบงานนี้แล้วตอบเป็น JSON เท่านั้น ไม่ต้องมีข้อความอื่น
-รูปแบบ: {"order_number":"","customer_name":"","platform":"","color_code":"","items":[{"width":0,"height":0,"quantity":0}],"order_date":"","technician":""}
+รูปแบบ: {"order_number":"","customer_name":"","platform":"","curtain_type":"","color_code":"","items":[{"width":0,"height":0,"quantity":0}],"order_date":"","technician":"","note":""}
 หมายเหตุสำคัญ:
 - order_number คือเลข ID ลูกค้าที่อยู่หลังชื่อ platform เช่น Tiktok : 2145696020 ให้ใส่ 2145696020
 - customer_name คือเลขออเดอร์ยาวๆ ที่อยู่บรรทัดถัดมา เช่น 583776830874748554
 - platform คือช่องทางที่เห็นในใบงาน เช่น Tiktok, Shopee, Facebook, LineOA, Lazada
+- curtain_type คือประเภทม่าน เช่น ม่านตาไก่, ม่านซ่อนหู, ม่านจีบ, ม่านโปร่ง
 - color_code คือรหัสสีผ้า เช่น HB81
 - items คือรายการขนาดทั้งหมด ให้เก็บทุกขนาดที่เห็น เช่น ก1.50*ส1.60 = 10 ผืน ให้ใส่ width:1.50, height:1.60, quantity:10
 - order_date คือวันที่ในใบงาน
+- note คือหมายเหตุพิเศษที่ลูกค้าขอเพิ่มเติม ถ้าไม่มีใส่ค่าว่าง
 - ถ้าไม่มีชื่อช่างใส่ technician เป็นค่าว่าง`,
           },
         ],
@@ -128,9 +130,11 @@ await client.replyMessage({
 ช่องทาง: ${data.platform}
 ลูกค้า: ${data.order_number}
 ออเดอร์: ${data.customer_name}
+ประเภทม่าน: ${data.curtain_type || '-'}
 สี: ${data.color_code}
 ขนาด:
 ${itemsText}
+หมายเหตุ: ${data.note || '-'}
 ช่าง: ${data.technician || '-'}`,
   }],
 });
