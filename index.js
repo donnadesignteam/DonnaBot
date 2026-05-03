@@ -75,7 +75,7 @@ async function handleImage(replyToken, messageId) {
           },
           {
             type: 'text',
-            text: 'อ่านข้อมูลจากใบงานแล้วตอบเป็น JSON เท่านั้น ห้ามมี markdown หรือข้อความอื่น ใช้รูปแบบ {"order_number":"","customer_name":"","platform":"","order_date":"","technician":"","note":"","items":[{"curtain_type":"","color_code":"","color_name":"","eye_color":"","width":0,"height":0,"quantity":0,"unit":"ผืน"}]} โดย order_number=เลข ID ลูกค้าหลัง platform, customer_name=เลขออเดอร์ยาวๆ, platform=Tiktok/Shopee/Facebook/LineOA/Lazada, order_date=วันที่ในใบ ถ้าปีไม่ชัดใช้ 2026, items=แยกทุกรายการแต่ละสีหรือประเภทเป็น 1 item, curtain_type=ม่านตาไก่/ม่านซ่อนหู/ผ้าโปร่ง ถ้าเป็นรางให้ใส่ curtain_type=รางม่าน, color_name อ่านให้ถูกต้องเช่นเทาเบจ เทาเมฆ ขาวครีม, eye_color=สีตาไก่เช่นสีขาวสีดำถ้าไม่มีใส่ว่าง, ถ้าเป็นรางให้ใส่ width=ความยาวราง height=0 เท่านั้น ถ้าเป็นม่านให้ใส่ width=กว้าง height=สูง อ่านเป็นเมตร เช่น ก1.30=1.30, unit=ผืนหรือชุด',
+            text: 'อ่านข้อมูลจากใบงานแล้วตอบเป็น JSON เท่านั้น ห้ามมี markdown หรือข้อความอื่น ใช้รูปแบบ {"order_number":"","customer_name":"","platform":"","order_date":"","technician":"","note":"","items":[{"curtain_type":"","rail_floors":"","rail_head":"","color_code":"","color_name":"","eye_color":"","width":0,"height":0,"quantity":0,"unit":"ผืน"}]} โดย order_number=เลข ID ลูกค้าหลัง platform, customer_name=เลขออเดอร์ยาวๆ, platform=Tiktok/Shopee/Facebook/LineOA/Lazada, order_date=วันที่ในใบ ถ้าปีไม่ชัดใช้ 2026, technician=ชื่อช่างถ้าไม่มีใส่ว่าง, note=หมายเหตุถ้าไม่มีใส่ว่าง, items=แยกทุกรายการแต่ละสีหรือประเภทเป็น 1 item, curtain_type=ประเภทเช่นรางตาไก่/ม่านตาไก่/ม่านซ่อนหู/ผ้าโปร่ง, rail_floors=จำนวนชั้นของรางเช่น1ชั้นหรือ2ชั้นถ้าไม่ใช่รางใส่ว่าง, rail_head=หัวรางเช่นหัวกระดูมหัวเรียบถ้าไม่ใช่รางใส่ว่าง, color_name=ชื่อสีอ่านให้ถูกต้องเช่นเทาเบจเทาเมฆขาวครีม, eye_color=สีตาไก่เช่นสีขาวสีดำถ้าไม่มีใส่ว่าง, ถ้าเป็นรางให้ใส่ width=ความยาวรางเป็นเมตรเช่น0.70=0.70 height=0, ถ้าเป็นม่านให้ใส่ width=กว้าง height=สูง อ่านเป็นเมตรเช่นก1.30=1.30, unit=ผืนหรือชุด',
           },
         ],
       }],
@@ -109,9 +109,10 @@ console.log('upload error:', uploadError);
     // ตอบกลับ LINE
     const itemsText = data.items.map(i => {
   const isRang = i.curtain_type.includes('ราง');
-  const size = isRang ? `${i.width}` : `${i.width}*${i.height}`;
+  const size = isRang ? `ยาว ${i.width} ม.` : `${i.width}*${i.height}`;
   const eye = i.eye_color ? `${i.eye_color} ` : '';
-  return `  ${i.curtain_type} ${eye}${i.color_code} ${i.color_name} ${size} = ${i.quantity} ${i.unit}`;
+  const railInfo = isRang ? ` ${i.rail_floors || ''} ${i.rail_head || ''}`.trim() : '';
+  return `  ${i.curtain_type}${railInfo} ${eye}${i.color_code || ''} ${i.color_name} ${size} = ${i.quantity} ${i.unit}`;
 }).join('\n');
 
 await client.replyMessage({
