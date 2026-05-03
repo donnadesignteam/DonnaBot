@@ -76,17 +76,38 @@ async function handleImage(replyToken, messageId) {
           {
             type: 'text',
             text: `อ่านข้อมูลจากใบงานนี้แล้วตอบเป็น JSON เท่านั้น ไม่ต้องมีข้อความอื่น
-รูปแบบ: {"order_number":"","customer_name":"","platform":"","curtain_type":"","color_code":"","items":[{"width":0,"height":0,"quantity":0}],"order_date":"","technician":"","note":""}
+รูปแบบ: {
+  "order_number":"",
+  "customer_name":"",
+  "platform":"",
+  "order_date":"",
+  "technician":"",
+  "note":"",
+  "items":[{
+    "curtain_type":"",
+    "color_code":"",
+    "color_name":"",
+    "eye_color":"",
+    "width":0,
+    "height":0,
+    "quantity":0,
+    "unit":"ผืน"
+  }]
+}
 หมายเหตุสำคัญ:
-- order_number คือเลข ID ลูกค้าที่อยู่หลังชื่อ platform เช่น Tiktok : 2145696020 ให้ใส่ 2145696020
-- customer_name คือเลขออเดอร์ยาวๆ ที่อยู่บรรทัดถัดมา เช่น 583776830874748554
-- platform คือช่องทางที่เห็นในใบงาน เช่น Tiktok, Shopee, Facebook, LineOA, Lazada
-- curtain_type คือประเภทม่าน เช่น ม่านตาไก่, ม่านซ่อนหู, ม่านจีบ, ม่านโปร่ง
-- color_code คือรหัสสีผ้า เช่น HB81
-- items คือรายการขนาดทั้งหมด ให้เก็บทุกขนาดที่เห็น เช่น ก1.50*ส1.60 = 10 ผืน ให้ใส่ width:1.50, height:1.60, quantity:10
-- order_date คือวันที่ในใบงาน
-- note คือหมายเหตุพิเศษที่ลูกค้าขอเพิ่มเติม ถ้าไม่มีใส่ค่าว่าง
-- ถ้าไม่มีชื่อช่างใส่ technician เป็นค่าว่าง`,
+- order_number คือเลข ID ลูกค้าหลังชื่อ platform เช่น shopee: lookmee180158 ให้ใส่ lookmee180158
+- customer_name คือชื่อคนสั่งซื้อส่วนใหญ่จะอยู่หลังช่องทาง ถ้าไม่มีให้ใส่ช่องว่าง ให้อ่านชื่อให้ครบที่สุดเท่าที่เห็น แม้จะเห็นแค่บางส่วน
+- platform คือช่องทาง เช่น Tiktok, Shopee, Facebook, LineOA, Lazada
+- order_date คือวันที่ในใบงาน ถ้าปีไม่ชัดเจนให้ใช้ปี 2026
+- technician คือชื่อช่างที่เขียนไว้ในใบ ถ้าไม่มีใส่ค่าว่าง
+- note คือหมายเหตุพิเศษ ถ้าไม่มีใส่ค่าว่าง
+- items ให้แยกทุกรายการที่เห็นในใบงาน แต่ละสีหรือแต่ละประเภทเป็น 1 item
+- curtain_type คือประเภท เช่น ม่านตาไก่, รางตาไก่, ม่านซ่อนหู, ผ้าโปร่ง
+- color_code คือรหัสสี เช่น S05, S18, HB81
+- color_name คือชื่อสี เช่น เทาเบจ, เทาเมฆ
+- eye_color คือสีตาไก่ เช่น ตาไก่สีขาว, ตาไก่สีดำ ถ้าไม่มีใส่ค่าว่าง
+- width และ height อ่านเป็นเมตร เช่น ก1.30 = 1.30
+- unit คือหน่วย เช่น ผืน หรือ ชุด`,
           },
         ],
       }],
@@ -117,9 +138,11 @@ console.log('upload error:', uploadError);
     await supabase.from('orders').insert([data]);
 
     // ตอบกลับ LINE
-    const itemsText = data.items.map(i => 
-  `  ${i.width}×${i.height} ม. = ${i.quantity} ผืน`
-).join('\n');
+    const itemsText = data.items.map(i => {
+  const size = i.height > 0 ? `${i.width}×${i.height} ม.` : `${i.width} ม.`;
+  const eye = i.eye_color ? ` (${i.eye_color})` : '';
+  return `  ${i.curtain_type}${eye} ${i.color_code} ${i.color_name}\n  ${size} = ${i.quantity} ${i.unit}`;
+}).join('\n');
 
 await client.replyMessage({
   replyToken,
@@ -130,9 +153,7 @@ await client.replyMessage({
 ช่องทาง: ${data.platform}
 ลูกค้า: ${data.order_number}
 ออเดอร์: ${data.customer_name}
-ประเภทม่าน: ${data.curtain_type || '-'}
-สี: ${data.color_code}
-ขนาด:
+รายการ:
 ${itemsText}
 หมายเหตุ: ${data.note || '-'}
 ช่าง: ${data.technician || '-'}`,
