@@ -76,14 +76,15 @@ async function handleImage(replyToken, messageId) {
           {
             type: 'text',
             text: `อ่านข้อมูลจากใบงานนี้แล้วตอบเป็น JSON เท่านั้น ไม่ต้องมีข้อความอื่น
-รูปแบบ: {"order_number":"","customer_name":"","color_code":"","width":0,"height":0,"quantity":0,"order_date":"","technician":""}
+รูปแบบ: {"order_number":"","customer_name":"","platform":"","color_code":"","items":[{"width":0,"height":0,"quantity":0}],"order_date":"","technician":""}
 หมายเหตุสำคัญ:
-- order_number ให้เก็บทุกเลขออเดอร์ที่เห็นในใบงาน คั่นด้วย comma
-- customer_name ให้อ่านชื่อลูกค้าหรือชื่อร้านที่เห็นในใบงาน
-- width และ height ให้อ่านเป็นเมตรจริงๆ เช่น ก1.30 แปลว่า width = 1.30 ไม่ใช่ 30
-- quantity คือจำนวนผืน เช่น 2 ผืน ให้ใส่ 2
-- order_date คือวันที่ในใบงาน เช่น 30 เม.ย. 2026
-- ถ้าไม่มีชื่อช่าง ให้ใส่ technician เป็นค่าว่าง`,
+- order_number คือเลข ID ลูกค้าที่อยู่หลังชื่อ platform เช่น Tiktok : 2145696020 ให้ใส่ 2145696020
+- customer_name คือเลขออเดอร์ยาวๆ ที่อยู่บรรทัดถัดมา เช่น 583776830874748554
+- platform คือช่องทางที่เห็นในใบงาน เช่น Tiktok, Shopee, Facebook, LineOA, Lazada
+- color_code คือรหัสสีผ้า เช่น HB81
+- items คือรายการขนาดทั้งหมด ให้เก็บทุกขนาดที่เห็น เช่น ก1.50*ส1.60 = 10 ผืน ให้ใส่ width:1.50, height:1.60, quantity:10
+- order_date คือวันที่ในใบงาน
+- ถ้าไม่มีชื่อช่างใส่ technician เป็นค่าว่าง`,
           },
         ],
       }],
@@ -114,13 +115,25 @@ console.log('upload error:', uploadError);
     await supabase.from('orders').insert([data]);
 
     // ตอบกลับ LINE
-    await client.replyMessage({
-      replyToken,
-      messages: [{
-        type: 'text',
-        text: `✅ บันทึกแล้วครับ\nวันที่: ${data.order_date}\nลูกค้า: ${data.customer_name}\nออเดอร์: ${data.order_number}\nสี: ${data.color_code}\nขนาด: ${data.width} x ${data.height} ม.\nจำนวน: ${data.quantity} ผืน`,
-      }],
-    });
+    const itemsText = data.items.map(i => 
+  `  ${i.width}×${i.height} ม. = ${i.quantity} ผืน`
+).join('\n');
+
+await client.replyMessage({
+  replyToken,
+  messages: [{
+    type: 'text',
+    text: `✅ บันทึกแล้วครับ
+วันที่: ${data.order_date}
+ช่องทาง: ${data.platform}
+ลูกค้า: ${data.order_number}
+ออเดอร์: ${data.customer_name}
+สี: ${data.color_code}
+ขนาด:
+${itemsText}
+ช่าง: ${data.technician || '-'}`,
+  }],
+});
 
   } catch (err) {
     console.error(err);
@@ -143,7 +156,7 @@ console.log('stock error:', error);
     ).join('\n');
 
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 500,
       messages: [{
         role: 'user',
