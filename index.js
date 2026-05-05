@@ -204,10 +204,10 @@ async function handleOrderText(replyToken, text) {
 
     await supabase.from('orders').insert([data]);
 
-    await client.replyMessage({
-      replyToken,
-      messages: [{ type: 'text', text: `✅ บันทึกออเดอร์แล้วครับ\nลูกค้า: ${data.customer_name}\nออเดอร์: ${data.order_number}\nสถานะ: รอคิว` }]
-    });
+    await client.replyMessageWithHttpInfo({
+  replyToken,
+  messages: [{ type: 'text', text: '✅' }]
+});
   } catch (err) {
     console.error(err);
   }
