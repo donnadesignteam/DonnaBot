@@ -33,6 +33,7 @@ app.post('/webhook',
 
 async function handleEvent(event) {
   if (event.type !== 'message') return;
+  console.log('groupId:', event.source.groupId);
   const { replyToken, message, source } = event;
 
   // ถ้าเป็นรูปภาพ → อ่านใบงาน
