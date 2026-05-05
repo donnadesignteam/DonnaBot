@@ -228,7 +228,7 @@ async function handleWorkImage(replyToken, messageId, groupId) {
       max_tokens: 200,
       messages: [{ role: 'user', content: [
         { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
-        { type: 'text', text: 'อ่านเลขออเดอร์จากภาพนี้ ตอบเป็น JSON เท่านั้น {"order_number":""}' }
+        { type: 'text', text: 'อ่านเลขออเดอร์ทั้งหมดจากภาพนี้ ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1","เลข2"]} ถ้ามีออเดอร์เดียวก็ใส่แค่ตัวเดียวในarray' }
       ]}]
     });
 
@@ -242,14 +242,17 @@ async function handleWorkImage(replyToken, messageId, groupId) {
     };
     const status = statusMap[groupId];
 
-    await supabase.from('orders')
-      .update({ status, status_updated_at: new Date().toISOString() })
-      .eq('customer_name', data.order_number);
+    for (const orderNum of data.order_numbers) {
+  await supabase.from('orders')
+    .update({ status, status_updated_at: new Date().toISOString() })
+    .eq('customer_name', orderNum);
+}
 
-    await client.replyMessage({
-      replyToken,
-      messages: [{ type: 'text', text: `✅ บันทึกแล้วครับ\nออเดอร์: ${data.order_number}\nสถานะ: ${status}` }]
-    });
+const orderList = data.order_numbers.join('\n');
+await client.replyMessage({
+  replyToken,
+  messages: [{ type: 'text', text: `✅ บันทึกแล้วครับ\nออเดอร์:\n${orderList}\nสถานะ: ${status}` }]
+});
   } catch (err) {
     console.error(err);
   }
