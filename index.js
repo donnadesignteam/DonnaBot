@@ -33,8 +33,30 @@ app.post('/webhook',
 
 async function handleEvent(event) {
   if (event.type !== 'message') return;
-  console.log('groupId:', event.source.groupId);
-  const { replyToken, message, source } = event;
+  const { replyToken, message } = event;
+  const groupId = event.source.groupId;
+
+  const GROUP_ORDER = process.env.GROUP_ORDER;
+  const GROUP_CUT = process.env.GROUP_CUT;
+  const GROUP_SEW = process.env.GROUP_SEW;
+  const GROUP_IRON = process.env.GROUP_IRON;
+
+  // กลุ่มแผนกออเดอร์ — อ่าน text บันทึกออเดอร์
+  if (groupId === GROUP_ORDER) {
+    if (message.type === 'text') {
+      await handleOrderText(replyToken, message.text);
+    }
+    return;
+  }
+
+  // กลุ่มช่าง 3 กลุ่ม — อ่านภาพดูเลขออเดอร์
+  if ([GROUP_CUT, GROUP_SEW, GROUP_IRON].includes(groupId)) {
+    if (message.type === 'image') {
+      await handleWorkImage(replyToken, message.id, groupId);
+    }
+    return;
+  }
+}
 
   // ถ้าเป็นรูปภาพ → อ่านใบงาน
   if (message.type === 'image') {
@@ -172,6 +194,77 @@ console.log('stock error:', error);
       replyToken,
       messages: [{ type: 'text', text: '❌ เกิดข้อผิดพลาด กรุณาลองใหม่ครับ' }],
     });
+  }
+}
+
+// อ่าน text ออเดอร์จากกลุ่มแผนกออเดอร์
+async function handleOrderText(replyToken, text) {
+  try {
+    const platforms = ['shopee', 'tiktok', 'lineoa', 'lazada', 'facebook'];
+    const hasPlatform = platforms.some(p => text.toLowerCase().includes(p));
+    if (!hasPlatform) return; // ไม่ใช่ออเดอร์ เงียบ
+
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1500,
+      messages: [{ role: 'user', content: 'อ่านข้อความออเดอร์นี้แล้วตอบเป็น JSON เท่านั้น ห้ามมี markdown {"order_number":"","customer_name":"","platform":"","order_date":"","note":"","items":[{"curtain_type":"","color_code":"","color_name":"","eye_color":"","rail_floors":"","rail_head":"","width":0,"height":0,"quantity":0,"unit":"ผืน"}]} order_number=เลข ID ลูกค้าหลัง platform, customer_name=เลขออเดอร์ยาวๆ, platform=Tiktok/Shopee/Facebook/LineOA/Lazada, order_date=วันที่ถ้าปีไม่ชัดใช้ 2026, items แยกทุกรายการ curtain_type=ประเภท rail_floors=จำนวนชั้นถ้าเป็นราง rail_head=หัวรางถ้ามี width/height อ่านเป็นเมตร ถ้าเป็นรางใส่แค่ width height=0\n\nข้อความ:\n' + text }]
+    });
+
+    const raw = response.content[0].text;
+    const cleaned = raw.replace(/```json|```/g, '').trim();
+    const data = JSON.parse(cleaned);
+    data.status = 'รอคิว';
+
+    await supabase.from('orders').insert([data]);
+
+    await client.replyMessage({
+      replyToken,
+      messages: [{ type: 'text', text: `✅ บันทึกออเดอร์แล้วครับ\nลูกค้า: ${data.customer_name}\nออเดอร์: ${data.order_number}\nสถานะ: รอคิว` }]
+    });
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+// อ่านภาพจากกลุ่มช่าง ดูแค่เลขออเดอร์
+async function handleWorkImage(replyToken, messageId, groupId) {
+  try {
+    const lineResponse = await fetch(`https://api-data.line.me/v2/bot/message/${messageId}/content`, {
+      headers: { Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}` }
+    });
+    const arrayBuffer = await lineResponse.arrayBuffer();
+    const imageBuffer = Buffer.from(arrayBuffer);
+    const base64Image = imageBuffer.toString('base64');
+
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 200,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
+        { type: 'text', text: 'อ่านเลขออเดอร์จากภาพนี้ ตอบเป็น JSON เท่านั้น {"order_number":""}' }
+      ]}]
+    });
+
+    const raw = response.content[0].text.replace(/```json|```/g, '').trim();
+    const data = JSON.parse(raw);
+
+    const statusMap = {
+      [process.env.GROUP_CUT]: 'กำลังตัด',
+      [process.env.GROUP_SEW]: 'กำลังเย็บ',
+      [process.env.GROUP_IRON]: 'กำลังรีด'
+    };
+    const status = statusMap[groupId];
+
+    await supabase.from('orders')
+      .update({ status, status_updated_at: new Date().toISOString() })
+      .eq('customer_name', data.order_number);
+
+    await client.replyMessage({
+      replyToken,
+      messages: [{ type: 'text', text: `✅ บันทึกแล้วครับ\nออเดอร์: ${data.order_number}\nสถานะ: ${status}` }]
+    });
+  } catch (err) {
+    console.error(err);
   }
 }
 
