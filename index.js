@@ -58,19 +58,6 @@ async function handleEvent(event) {
   }
 }
 
-  // ถ้าเป็นรูปภาพ → อ่านใบงาน
-  if (message.type === 'image') {
-    await handleImage(replyToken, message.id);
-    return;
-  }
-
-  // ถ้าเป็นข้อความขึ้นต้นด้วย @บอท → ตอบคำถาม
-  if (message.type === 'text' && message.text.startsWith('@บอท')) {
-    const question = message.text.replace('@บอท', '').trim();
-    await handleQuestion(replyToken, question);
-    return;
-  }
-}
 
 // อ่านภาพใบงาน
 async function handleImage(replyToken, messageId) {
