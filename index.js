@@ -228,7 +228,7 @@ async function handleWorkImage(replyToken, messageId, groupId) {
       max_tokens: 200,
       messages: [{ role: 'user', content: [
         { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
-        { type: 'text', text: 'อ่านเลขออเดอร์ทั้งหมดจากภาพนี้ ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1","เลข2"]} ถ้ามีออเดอร์เดียวก็ใส่แค่ตัวเดียวในarray' }
+        { type: 'text', text: 'อ่านเลขออเดอร์จากภาพนี้ ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1","เลข2"]} เลขออเดอร์คือเลขยาวๆที่อยู่ใต้ชื่อ platform เช่น 583776830874748554 ไม่ใช่ ID ลูกค้าสั้นๆหลัง Tiktok:/Shopee: เช่น 2145696020' }
       ]}]
     });
 
