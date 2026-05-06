@@ -305,7 +305,7 @@ ${(knowledge || []).map(k => `[${k.category}] ${k.question}: ${k.answer}`).join(
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1000,
-      messages: [{ role: 'user', content: `${context}\n\nคำถาม: ${question}\n\nตอบเป็นภาษาไทย กระชับ` }]
+      messages: [{ role: 'user', content: `${context}\n\nคำถาม: ${question}\n\nตอบเป็นภาษาไทยแบบเป็นกันเอง กระชับ ใช้หางเสียงว่า "ค่ะ" ห้ามใช้ markdown หรือ **ตัวหนา**` }]
     });
 
     await client.replyMessage({
