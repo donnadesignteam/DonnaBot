@@ -35,6 +35,7 @@ async function handleEvent(event) {
   if (event.type !== 'message') return;
   const { replyToken, message } = event;
   const groupId = event.source.groupId;
+  console.log('incoming groupId:', groupId, 'type:', message.type);
 
   const GROUP_ORDER = process.env.GROUP_ORDER;
   const GROUP_CUT = process.env.GROUP_CUT;
