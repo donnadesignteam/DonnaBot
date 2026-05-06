@@ -70,11 +70,11 @@ async function handleImage(replyToken, messageId) {
 });
     const arrayBuffer = await lineResponse.arrayBuffer();
     const imageBuffer = Buffer.from(arrayBuffer);
-    const compressedBuffer = await sharp(imageBuffer)
+    const workCompressedBuffer = await sharp(imageBuffer)
   .resize(600, 600, { fit: 'inside' })
   .jpeg({ quality: 60 })
   .toBuffer();
-const base64Image = compressedBuffer.toString('base64');
+const base64Image = workCompressedBuffer.toString('base64');
 
     // ส่งให้ Claude อ่าน
     const response = await anthropic.messages.create({
