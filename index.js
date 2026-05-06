@@ -287,13 +287,20 @@ async function handleAdminQuestion(replyToken, question) {
       .from('stock')
       .select('*');
 
+      const { data: knowledge } = await supabase
+  .from('knowledge')
+  .select('*');
+
     const context = `
 ข้อมูลออเดอร์ล่าสุด 50 รายการ:
 ${JSON.stringify(orders)}
 
 ข้อมูลสต็อกผ้า:
-${stock.map(s => `${s.color_code} ${s.color_name}: ${s.quantity_remaining} ม้วน`).join('\n')}
-    `;
+${(stock || []).map(s => `${s.color_code} ${s.color_name}: ${s.quantity_remaining} ม้วน`).join('\n')}
+
+ข้อมูลความรู้ร้าน:
+${(knowledge || []).map(k => `[${k.category}] ${k.question}: ${k.answer}`).join('\n')}
+`;
 
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
