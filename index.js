@@ -41,6 +41,14 @@ async function handleEvent(event) {
   const GROUP_SEW = process.env.GROUP_SEW;
   const GROUP_IRON = process.env.GROUP_IRON;
 
+  if (groupId === process.env.GROUP_ADMIN) {
+  if (message.type === 'text' && message.text.startsWith('@บอท')) {
+    const question = message.text.replace('@บอท', '').trim();
+    await handleAdminQuestion(replyToken, question);
+  }
+  return;
+}
+
   // กลุ่มแผนกออเดอร์ — อ่าน text บันทึกออเดอร์
   if (groupId === GROUP_ORDER) {
     if (message.type === 'text') {
@@ -225,7 +233,11 @@ async function handleWorkImage(replyToken, messageId, groupId) {
     });
     const arrayBuffer = await lineResponse.arrayBuffer();
     const imageBuffer = Buffer.from(arrayBuffer);
-    const base64Image = imageBuffer.toString('base64');
+    const workCompressedBuffer = await sharp(imageBuffer)
+  .resize(600, 600, { fit: 'inside' })
+  .jpeg({ quality: 60 })
+  .toBuffer();
+const base64Image = workCompressedBuffer.toString('base64');
 
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
@@ -249,7 +261,7 @@ async function handleWorkImage(replyToken, messageId, groupId) {
     for (const orderNum of data.order_numbers) {
   await supabase.from('orders')
     .update({ status, status_updated_at: new Date().toISOString() })
-    .eq('customer_name', orderNum);
+    .eq('order_number', orderNum);
 }
 
 const orderList = data.order_numbers.join('\n');
@@ -257,6 +269,41 @@ await client.replyMessage({
   replyToken,
   messages: [{ type: 'text', text: `✅ บันทึกแล้วครับ\nออเดอร์:\n${orderList}\nสถานะ: ${status}` }]
 });
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function handleAdminQuestion(replyToken, question) {
+  try {
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    const { data: stock } = await supabase
+      .from('stock')
+      .select('*');
+
+    const context = `
+ข้อมูลออเดอร์ล่าสุด 50 รายการ:
+${JSON.stringify(orders)}
+
+ข้อมูลสต็อกผ้า:
+${stock.map(s => `${s.color_code} ${s.color_name}: ${s.quantity_remaining} ม้วน`).join('\n')}
+    `;
+
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: `${context}\n\nคำถาม: ${question}\n\nตอบเป็นภาษาไทย กระชับ` }]
+    });
+
+    await client.replyMessage({
+      replyToken,
+      messages: [{ type: 'text', text: response.content[0].text }]
+    });
   } catch (err) {
     console.error(err);
   }
