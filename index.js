@@ -245,12 +245,20 @@ const base64Image = workCompressedBuffer.toString('base64');
       max_tokens: 200,
       messages: [{ role: 'user', content: [
         { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
-        { type: 'text', text: 'อ่านเลขออเดอร์จากภาพนี้ ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1","เลข2"]} เลขออเดอร์คือเลขยาวๆที่อยู่ใต้ชื่อ platform เช่น 583776830874748554 ไม่ใช่ ID ลูกค้าสั้นๆหลัง Tiktok:/Shopee: เช่น 2145696020' }
+        { type: 'text', text: 'อ่านเลขออเดอร์จากภาพนี้ ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1","เลข2"],"unclear":false} เลขออเดอร์คือเลขยาวๆที่อยู่ใต้ชื่อ platform เช่น 583776830874748554 ไม่ใช่ ID ลูกค้าสั้นๆหลัง Tiktok:/Shopee: เช่น 2145696020 ถ้าภาพไม่ชัดหรืออ่านเลขไม่ได้ให้ใส่ unclear:true และ order_numbers:[]' }
       ]}]
     });
 
     const raw = response.content[0].text.replace(/```json|```/g, '').trim();
     const data = JSON.parse(raw);
+
+if (data.unclear || data.order_numbers.length === 0) {
+  await client.replyMessage({
+    replyToken,
+    messages: [{ type: 'text', text: '⚠️ อ่านเลขออเดอร์ไม่ชัดค่ะ กรุณาถ่ายภาพใหม่ให้เห็นตัวเลขชัดขึ้นค่ะ' }]
+  });
+  return;
+}
 
     const statusMap = {
       [process.env.GROUP_CUT]: 'กำลังตัด',
