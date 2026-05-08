@@ -79,8 +79,11 @@ async function handleImage(replyToken, messageId) {
 });
     const arrayBuffer = await lineResponse.arrayBuffer();
     const imageBuffer = Buffer.from(arrayBuffer);
-    const workCompressedBuffer = await sharp(imageBuffer)
-  .rotate()
+    const metadata = await sharp(imageBuffer).metadata();
+const isLandscape = metadata.width > metadata.height;
+
+const workCompressedBuffer = await sharp(imageBuffer)
+  .rotate(isLandscape ? 90 : 0)
   .resize(800, 800, { fit: 'inside' })
   .jpeg({ quality: 70 })
   .toBuffer();
