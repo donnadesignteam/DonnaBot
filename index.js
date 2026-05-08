@@ -372,18 +372,6 @@ const context = 'ข้อมูลออเดอร์ล่าสุด 50 �
   '\n\nข้อมูลสต็อกผ้า:\n' + stockText +
   '\n\nข้อมูลความรู้ร้าน:\n' + knowledgeText +
   '\n\nข้อมูลราคาสินค้า:\n' + pricingText;
-ข้อมูลออเดอร์ล่าสุด 50 รายการ:
-${JSON.stringify(orders)}
-
-ข้อมูลสต็อกผ้า:
-${(stock || []).map(s => `${s.color_code} ${s.color_name}: ${s.quantity_remaining} ม้วน`).join('\n')}
-
-ข้อมูลความรู้ร้าน:
-${(knowledge || []).map(k => `[${k.category}] ${k.question}: ${k.answer}`).join('\n')}
-`;
-
-ข้อมูลราคาสินค้า:
-${(pricing || []).map(p => `[${p.category}] ${p.product_name}: ${p.price_per_unit} บาท/${p.unit} ${p.note || ''}`).join('\n')}
 
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
