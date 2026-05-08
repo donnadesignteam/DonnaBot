@@ -59,9 +59,22 @@ async function handleEvent(event) {
   }
 
   // กลุ่มช่าง 3 กลุ่ม — อ่านภาพดูเลขออเดอร์
-  if ([GROUP_CUT, GROUP_SEW, GROUP_IRON].includes(groupId)) {
+ if ([GROUP_CUT, GROUP_SEW, GROUP_IRON].includes(groupId)) {
     if (message.type === 'image') {
       await handleWorkImage(replyToken, message.id, groupId);
+      return;
+    }
+    if (message.type === 'text') {
+      const text = message.text.trim();
+      if (text === 'ถูก') {
+        await handleFeedbackCorrect(replyToken, groupId);
+        return;
+      }
+      if (text.startsWith('แก้ ')) {
+        const correctNum = text.replace('แก้ ', '').trim();
+        await handleFeedbackCorrect(replyToken, groupId, correctNum);
+        return;
+      }
     }
     return;
   }
