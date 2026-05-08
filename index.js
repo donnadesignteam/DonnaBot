@@ -79,11 +79,7 @@ async function handleImage(replyToken, messageId) {
 });
     const arrayBuffer = await lineResponse.arrayBuffer();
     const imageBuffer = Buffer.from(arrayBuffer);
-    const metadata = await sharp(imageBuffer).metadata();
-const isLandscape = metadata.width > metadata.height;
-
-const workCompressedBuffer = await sharp(imageBuffer)
-  .rotate(isLandscape ? 90 : 0)
+    const workCompressedBuffer = await sharp(imageBuffer)
   .resize(800, 800, { fit: 'inside' })
   .jpeg({ quality: 70 })
   .toBuffer();
@@ -250,7 +246,7 @@ const base64Image = workCompressedBuffer.toString('base64');
       max_tokens: 200,
       messages: [{ role: 'user', content: [
         { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
-        { type: 'text', text: 'อ่านเลขออเดอร์จากภาพนี้ ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false} กฎ: 1) ภาพอาจหมุนหรือเอียง ให้พยายามอ่านทุกทิศทาง 2) เลขออเดอร์คือเลขยาวๆใต้ชื่อ platform เช่น 260424MSNN9DUJ ไม่ใช่ ID สั้นๆ 3) ถ้าเห็นสติ๊กเกอร์หรือวัตถุปิดทับบนตัวเลขทำให้อ่านไม่ครบให้ unclear:true 4) ถ้าภาพเบลอหรือมืดจนอ่านไม่ออกให้ unclear:true 5) ถ้าภาพหมุนแต่เลขเห็นชัดครบทุกตัวให้อ่านได้เลย' }
+        { type: 'text', text: 'ภาพอาจถ่ายมาเอียงหรือหมุน ให้อ่านข้อความในทุกทิศทาง อ่านเลขออเดอร์จากภาพนี้ ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false} กฎ: 1) เลขออเดอร์คือเลขยาวๆใต้ชื่อ platform เช่น 260416IG9B3BBWB ไม่ใช่ ID สั้นๆ 2) ถ้าเห็นสติ๊กเกอร์ปิดทับบนตัวเลขทำให้อ่านไม่ครบให้ unclear:true 3) ถ้าภาพเบลอจนอ่านไม่ออกให้ unclear:true 4) ถ้าเห็นเลขชัดแม้ภาพจะเอียงให้อ่านได้เลย ห้ามเดาตัวเลขที่ไม่เห็น' }
       ]}]
     });
 
