@@ -220,7 +220,7 @@ async function handleWorkImage(replyToken, messageId, groupId) {
       max_tokens: 200,
       messages: [{ role: 'user', content: [
         { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
-        { type: 'text', text: exampleText + 'ค้นหาและอ่านเลขออเดอร์จากภาพนี้ ภาพอาจหมุนหรือเอียงให้อ่านในทุกทิศทาง ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false} กฎ: 1) เลขออเดอร์คือเลขยาวๆที่มีตัวอักษรและตัวเลขปนกัน เช่น 260417ZXA1VJVQ หรือ 583776830874748554 อยู่บรรทัดที่ 3 ถัดจากชื่อ platform และชื่อลูกค้า 2) ไม่ใช่วันที่ เช่น 18/4/2026 หรือ 2026-05-08 3) ไม่ใช่ ID สั้นๆหลัง platform เช่น surinprakrueng 4) ถ้าสติ๊กเกอร์บังตัวเลขให้ unclear:true 5) ถ้าไม่มั่นใจให้ unclear:true 6) ห้ามเดาตัวเลขที่มองไม่เห็น' }
+        { type: 'text', text: exampleText + 'ภาพนี้อาจถ่ายในแนวนอนหรือเอียง ให้หมุนภาพในใจแล้วอ่านข้อความ เลขออเดอร์อยู่บรรทัดที่ 3 ของใบงาน ถัดจากวันที่และชื่อ platform+ชื่อลูกค้า รูปแบบเลขออเดอร์คือตัวอักษรและตัวเลขปนกัน ยาว 10-20 ตัว เช่น 260417ZXA1VJVQ หรือ 583776830874748554 ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false} กฎ: 1) ไม่ใช่วันที่ เช่น 18/4/2026 2) ไม่ใช่ชื่อลูกค้าสั้นๆ เช่น surinprakrueng 3) ถ้าสติ๊กเกอร์บังตัวเลขให้ unclear:true 4) ถ้าไม่มั่นใจในตัวอักษรใดให้ unclear:true 5) ห้ามเดา' }
       ]}]
     });
 
