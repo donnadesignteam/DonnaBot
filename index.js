@@ -356,7 +356,22 @@ async function handleAdminQuestion(replyToken, question) {
   .from('pricing')
   .select('*');
 
-    const context = `
+    const pricingText = (pricing || []).map(p => 
+  '[' + p.category + '] ' + p.product_name + ': ' + p.price_per_unit + ' บาท/' + p.unit + ' ' + (p.note || '')
+).join('\n');
+
+const knowledgeText = (knowledge || []).map(k => 
+  '[' + k.category + '] ' + k.question + ': ' + k.answer
+).join('\n');
+
+const stockText = (stock || []).map(s => 
+  s.color_code + ' ' + s.color_name + ': ' + s.quantity_remaining + ' ม้วน'
+).join('\n');
+
+const context = 'ข้อมูลออเดอร์ล่าสุด 50 รายการ:\n' + JSON.stringify(orders) +
+  '\n\nข้อมูลสต็อกผ้า:\n' + stockText +
+  '\n\nข้อมูลความรู้ร้าน:\n' + knowledgeText +
+  '\n\nข้อมูลราคาสินค้า:\n' + pricingText;
 ข้อมูลออเดอร์ล่าสุด 50 รายการ:
 ${JSON.stringify(orders)}
 
