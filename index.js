@@ -206,11 +206,10 @@ async function handleWorkImage(replyToken, messageId, groupId) {
     const metadata = await sharp(imageBuffer).metadata();
 const isLandscape = metadata.width > metadata.height;
 
-const processedBuffer = isLandscape
-  ? await sharp(imageBuffer).rotate(90).toBuffer()
-  : imageBuffer;
-
-const base64Image = processedBuffer.toString('base64');
+const base64Image = imageBuffer.toString('base64');
+const base64ImageRotated = isLandscape
+  ? (await sharp(imageBuffer).rotate(90).toBuffer()).toString('base64')
+  : (await sharp(imageBuffer).rotate(270).toBuffer()).toString('base64');
 
     const { data: examples } = await supabase
       .from('order_examples')
@@ -222,12 +221,13 @@ const base64Image = processedBuffer.toString('base64');
       ? 'ตัวอย่างเลขออเดอร์จากร้านนี้: ' + examples.map(e => e.correct_order_number).join(', ') + ' '
       : '';
 
-    const response = await anthropic.messages.create({
+   const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 200,
       messages: [{ role: 'user', content: [
         { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
-        { type: 'text', text: exampleText + 'ภาพนี้อาจถ่ายในแนวนอนหรือเอียง ให้หมุนภาพในใจแล้วอ่านข้อความ เลขออเดอร์อยู่บรรทัดที่ 3 ของใบงาน ถัดจากวันที่และชื่อ platform+ชื่อลูกค้า รูปแบบเลขออเดอร์คือตัวอักษรและตัวเลขปนกัน ยาว 10-20 ตัว เช่น 260417ZXA1VJVQ หรือ 583776830874748554 ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false} กฎ: 1) ไม่ใช่วันที่ เช่น 18/4/2026 2) ไม่ใช่ชื่อลูกค้าสั้นๆ เช่น surinprakrueng 3) ถ้าสติ๊กเกอร์บังตัวเลขให้ unclear:true 4) ถ้าไม่มั่นใจในตัวอักษรใดให้ unclear:true 5) ห้ามเดา' }
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64ImageRotated } },
+        { type: 'text', text: exampleText + 'ส่งภาพ 2 เวอร์ชั่น ต้นฉบับและหมุน 90 องศา ให้เลือกเวอร์ชั่นที่อ่านเลขออเดอร์ได้ชัดที่สุด เลขออเดอร์อยู่บรรทัดที่ 3 ถัดจากวันที่และชื่อ platform+ลูกค้า รูปแบบเช่น 260417ZXA1VJVQ หรือ 583776830874748554 ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false} กฎ: 1) ไม่ใช่วันที่ 2) ไม่ใช่ชื่อลูกค้า 3) ถ้าสติ๊กเกอร์บังให้ unclear:true 4) ถ้าไม่มั่นใจให้ unclear:true 5) ห้ามเดา' }
       ]}]
     });
 
