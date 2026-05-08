@@ -228,7 +228,7 @@ const { data: examples } = await supabase
       content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: rotated } });
     }
 
-    content.push({ type: 'text', text: exampleText + 'ส่งภาพ 2 เวอร์ชั่น ต้นฉบับและหมุน 270 องศา ให้เลือกเวอร์ชั่นที่อ่านเลขออเดอร์ได้ชัดที่สุด เลขออเดอร์อยู่บรรทัดที่ 3 ถัดจากวันที่และชื่อ platform+ลูกค้า รูปแบบเช่น 260417ZXA1VJVQ หรือ 583776830874748554 หรือ 1082651067631474 ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false,"use_customer_name":false} กฎ: 1) ไม่ใช่วันที่ 2) ไม่ใช่ชื่อลูกค้า 3) ถ้ามีสติ๊กเกอร์ปิดทับเลขออเดอร์ให้ unclear:true 4) ถ้าไม่มั่นใจให้ unclear:true 5) ห้ามเดา 6) ถ้าเลขออเดอร์โดนปิดหรือไม่มีเลยให้ใส่ platform_ชื่อลูกค้า แทนใน order_numbers เช่น "tiktok: FFF" "Shopee: AAA" "FB: BBB" "Facebook: CCC" "LineOA: DDD" "Lazada: EEE" และ unclear:false ในกรฯณีนี้' });
+    content.push({ type: 'text', text: exampleText + 'ส่งภาพ 2 เวอร์ชั่น ต้นฉบับและหมุน 270 องศา ให้เลือกเวอร์ชั่นที่อ่านเลขออเดอร์ได้ชัดที่สุด เลขออเดอร์อยู่บรรทัดที่ 3 ถัดจากวันที่และชื่อ platform+ลูกค้า รูปแบบเช่น 260417ZXA1VJVQ หรือ 583776830874748554 หรือ 1082651067631474 ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false,"use_customer_name":false} กฎ: 1) ไม่ใช่วันที่ 2) ไม่ใช่ชื่อลูกค้า 3) ถ้ามีสติ๊กเกอร์ปิดทับเลขออเดอร์ให้ unclear:true 4) ถ้าไม่มั่นใจให้ unclear:true 5) ห้ามเดา 6) ถ้าเลขออเดอร์โดนปิดหรือไม่มีเลยให้ใส่ platform_ชื่อลูกค้า แทนใน order_numbers เช่น "tiktok: FFF","Shopee: AAA","FB: BBB","Facebook: CCC","LineOA: DDD","Lazada: EEE" และ unclear:false ในกรฯณีนี้' });
 
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
