@@ -207,7 +207,7 @@ async function handleOrderText(replyToken, text) {
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1500,
-      messages: [{ role: 'user', content: 'อ่านข้อความออเดอร์นี้แล้วตอบเป็น JSON เท่านั้น ห้ามมี markdown {"order_number":"","customer_name":"","platform":"","order_date":"","note":"","items":[{"curtain_type":"","color_code":"","color_name":"","eye_color":"","rail_floors":"","rail_head":"","width":0,"height":0,"quantity":0,"unit":"ผืน"}]} order_number=เลข ID ลูกค้าหลัง platform, customer_name=เลขออเดอร์ยาวๆ, platform=Tiktok/Shopee/Facebook/LineOA/Lazada, order_date=วันที่ถ้าปีไม่ชัดใช้ 2026, items แยกทุกรายการ curtain_type=ประเภท rail_floors=จำนวนชั้นถ้าเป็นราง rail_head=หัวรางถ้ามี width/height อ่านเป็นเมตร ถ้าเป็นรางใส่แค่ width height=0\n\nข้อความ:\n' + text }]
+      messages: [{ role: 'user', content: 'อ่านข้อความออเดอร์นี้แล้วตอบเป็น JSON เท่านั้น ห้ามมี markdown {"order_number":"","customer_name":"","platform":"","order_date":"","note":"","items":[{"curtain_type":"","color_code":"","color_name":"","eye_color":"","rail_floors":"","rail_head":"","width":0,"height":0,"quantity":0,"unit":"ผืน"}]} order_number=เลข ID ลูกค้าหลัง platform, customer_name=เลขออเดอร์ยาวๆถ้าไม่มีให้ใช้ชื่อลูกค้าแทน, order_number=เลข ID ลูกค้าหลัง platform ถ้าไม่มีให้ใช้ชื่อลูกค้าแทน, platform=Tiktok/Shopee/Facebook/LineOA/Lazada, order_date=วันที่ถ้าปีไม่ชัดใช้ 2026, items แยกทุกรายการ curtain_type=ประเภท rail_floors=จำนวนชั้นถ้าเป็นราง rail_head=หัวรางถ้ามี width/height อ่านเป็นเมตร ถ้าเป็นรางใส่แค่ width height=0\n\nข้อความ:\n' + text }]
     });
 
     const raw = response.content[0].text;
@@ -260,9 +260,21 @@ const base64Image = workCompressedBuffer.toString('base64');
     const status = statusMap[groupId];
 
     for (const orderNum of data.order_numbers) {
-  await supabase.from('orders')
-    .update({ status, status_updated_at: new Date().toISOString() })
-    .eq('order_number', orderNum);
+  const { data: found } = await supabase
+    .from('orders')
+    .select('id')
+    .eq('order_number', orderNum)
+    .limit(1);
+
+  if (found && found.length > 0) {
+    await supabase.from('orders')
+      .update({ status, status_updated_at: new Date().toISOString() })
+      .eq('order_number', orderNum);
+  } else {
+    await supabase.from('orders')
+      .update({ status, status_updated_at: new Date().toISOString() })
+      .eq('customer_name', orderNum);
+  }
 }
 
 const orderList = data.order_numbers.join('\n');
