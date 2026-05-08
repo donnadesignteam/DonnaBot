@@ -80,6 +80,7 @@ async function handleImage(replyToken, messageId) {
     const arrayBuffer = await lineResponse.arrayBuffer();
     const imageBuffer = Buffer.from(arrayBuffer);
     const workCompressedBuffer = await sharp(imageBuffer)
+  .rotate()
   .resize(600, 600, { fit: 'inside' })
   .jpeg({ quality: 60 })
   .toBuffer();
@@ -111,6 +112,7 @@ const data = JSON.parse(cleaned);
 
     // อัปโหลดรูปไป Supabase Storage
     const compressedBuffer = await sharp(imageBuffer)
+  .rotate()
   .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
   .jpeg({ quality: 70 })
   .toBuffer();
