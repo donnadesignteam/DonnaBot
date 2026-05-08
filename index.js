@@ -207,7 +207,6 @@ async function handleWorkImage(replyToken, messageId, groupId) {
 const isLandscape = metadata.width > metadata.height;
 
 const base64Image = imageBuffer.toString('base64');
-const base64Image90 = (await sharp(imageBuffer).rotate(90).toBuffer()).toString('base64');
 const base64Image270 = (await sharp(imageBuffer).rotate(270).toBuffer()).toString('base64');
 
     const { data: examples } = await supabase
@@ -225,8 +224,7 @@ const base64Image270 = (await sharp(imageBuffer).rotate(270).toBuffer()).toStrin
       max_tokens: 200,
       messages: [{ role: 'user', content: [
   { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
-  { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image90 } },
-  { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image270 } },
+{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image270 } },
   { type: 'text', text: exampleText + 'ส่งภาพ 3 เวอร์ชั่น ต้นฉบับ หมุน 90 และหมุน 270 องศา ให้เลือกเวอร์ชั่นที่อ่านเลขออเดอร์ได้ชัดที่สุด เลขออเดอร์อยู่บรรทัดที่ 3 ถัดจากวันที่และชื่อ platform+ลูกค้า รูปแบบเช่น 260417ZXA1VJVQ หรือ 583776830874748554 ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false} กฎ: 1) ไม่ใช่วันที่ 2) ไม่ใช่ชื่อลูกค้า 3) ถ้าสติ๊กเกอร์บังให้ unclear:true 4) ถ้าไม่มั่นใจให้ unclear:true 5) ห้ามเดา' }
 ]}]
     });
