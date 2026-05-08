@@ -221,10 +221,7 @@ const { data: examples } = await supabase
       { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
     ];
 
-    if (isLandscape) {
-      const rotated = (await sharp(imageBuffer).rotate(270).toBuffer()).toString('base64');
-      content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: rotated } });
-    }
+    
     console.log('isLandscape:', isLandscape, 'width:', metadata.width, 'height:', metadata.height);
     if (isLandscape) {
       const rotated = (await sharp(imageBuffer).rotate(270).toBuffer()).toString('base64');
