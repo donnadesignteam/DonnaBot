@@ -247,7 +247,7 @@ const base64Image = workCompressedBuffer.toString('base64');
       max_tokens: 200,
       messages: [{ role: 'user', content: [
         { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
-        { type: 'text', text: 'อ่านเลขออเดอร์จากภาพนี้ ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1","เลข2"],"unclear":false} เลขออเดอร์คือเลขยาวๆที่อยู่ใต้ชื่อ platform เช่น 583776830874748554 ไม่ใช่ ID ลูกค้าสั้นๆหลัง Tiktok:/Shopee: เช่น 2145696020 ถ้าภาพไม่ชัดหรืออ่านเลขไม่ได้ให้ใส่ unclear:true และ order_numbers:[]' }
+        { type: 'text', text: 'อ่านเลขออเดอร์จากภาพนี้ ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1","เลข2"],"unclear":false} เลขออเดอร์คือเลขยาวๆที่อยู่ใต้ชื่อ platform เช่น 583776830874748554 ไม่ใช่ ID ลูกค้าสั้นๆหลัง Tiktok:/Shopee: เช่น 2145696020 ถ้าภาพไม่ชัด อ่านไม่ครบ มีสิ่งบัง หรือไม่มั่นใจในตัวเลขแม้แต่ตัวเดียวให้ใส่ unclear:true และ order_numbers:[] ทันที ห้ามเดาตัวเลขที่มองไม่เห็นชัดเจน' }
       ]}]
     });
 
