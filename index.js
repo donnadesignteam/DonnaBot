@@ -247,7 +247,7 @@ const base64Image = workCompressedBuffer.toString('base64');
       max_tokens: 200,
       messages: [{ role: 'user', content: [
         { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
-        { type: 'text', text: 'อ่านเลขออเดอร์จากภาพนี้ ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false} กฎ: 1) เลขออเดอร์คือเลขยาวๆใต้ platform ไม่ใช่ ID สั้นๆ 2) ถ้าตัวอักษรถูกบังหรือไม่ชัดเจนจริงๆ ให้ unclear:true order_numbers:[] 3) ห้ามเดาตัวอักษรที่มองไม่เห็น 4) ถ้าภาพหมุนให้อ่านตามทิศทางที่ถูกต้อง 5) ถ้าเห็นเลขออเดอร์ชัดเจนแม้ภาพจะเอียงให้อ่านได้เลย' }
+        { type: 'text', text: 'อ่านเลขออเดอร์จากภาพนี้ ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false} กฎ: 1) ภาพอาจหมุนหรือเอียง ให้พยายามอ่านทุกทิศทาง 2) เลขออเดอร์คือเลขยาวๆใต้ชื่อ platform เช่น 260424MSNN9DUJ ไม่ใช่ ID สั้นๆ 3) ถ้าเห็นสติ๊กเกอร์หรือวัตถุปิดทับบนตัวเลขทำให้อ่านไม่ครบให้ unclear:true 4) ถ้าภาพเบลอหรือมืดจนอ่านไม่ออกให้ unclear:true 5) ถ้าภาพหมุนแต่เลขเห็นชัดครบทุกตัวให้อ่านได้เลย' }
       ]}]
     });
 
