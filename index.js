@@ -252,7 +252,18 @@ const base64Image = workCompressedBuffer.toString('base64');
     });
 
     const raw = response.content[0].text.replace(/```json|```/g, '').trim();
-    const data = JSON.parse(raw);
+console.log('work image raw:', raw);
+
+let data;
+try {
+  data = JSON.parse(raw);
+} catch (e) {
+  await client.replyMessage({
+    replyToken,
+    messages: [{ type: 'text', text: '⚠️ อ่านเลขออเดอร์ไม่ชัดค่ะ กรุณาถ่ายภาพใหม่ให้เห็นตัวเลขชัดขึ้นค่ะ' }]
+  });
+  return;
+}
 
 if (data.unclear || data.order_numbers.length === 0) {
   await client.replyMessage({
