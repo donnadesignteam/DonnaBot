@@ -203,13 +203,7 @@ async function handleWorkImage(replyToken, messageId, groupId) {
     const arrayBuffer = await lineResponse.arrayBuffer();
     const imageBuffer = Buffer.from(arrayBuffer);
 
-    const workCompressedBuffer = await sharp(imageBuffer)
-  .resize(800, 800, { fit: 'inside' })
-  .normalise()
-  .sharpen()
-  .jpeg({ quality: 70 })
-  .toBuffer();
-    const base64Image = workCompressedBuffer.toString('base64');
+    const base64Image = imageBuffer.toString('base64');
 
     const { data: examples } = await supabase
       .from('order_examples')
