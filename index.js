@@ -203,7 +203,14 @@ async function handleWorkImage(replyToken, messageId, groupId) {
     const arrayBuffer = await lineResponse.arrayBuffer();
     const imageBuffer = Buffer.from(arrayBuffer);
 
-    const base64Image = imageBuffer.toString('base64');
+    const metadata = await sharp(imageBuffer).metadata();
+const isLandscape = metadata.width > metadata.height;
+
+const processedBuffer = isLandscape
+  ? await sharp(imageBuffer).rotate(90).toBuffer()
+  : imageBuffer;
+
+const base64Image = processedBuffer.toString('base64');
 
     const { data: examples } = await supabase
       .from('order_examples')
