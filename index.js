@@ -18,6 +18,7 @@ const client = new line.messagingApi.MessagingApiClient({
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const lastImagePerGroup = {};
 
 // Webhook route
 app.post('/webhook',
@@ -254,12 +255,22 @@ async function handleWorkImage(replyToken, messageId, groupId) {
   .toBuffer();
 const base64Image = workCompressedBuffer.toString('base64');
 
+const { data: examples } = await supabase
+      .from('order_examples')
+      .select('correct_order_number')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    const exampleText = examples && examples.length > 0
+      ? `ตัวอย่างเลขออเดอร์จากร้านนี้: ${examples.map(e => e.correct_order_number).join(', ')} `
+      : '';
+
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 200,
       messages: [{ role: 'user', content: [
         { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
-        { type: 'text', text: 'ภาพอาจถ่ายมาเอียงหรือหมุน ให้อ่านข้อความในทุกทิศทาง อ่านเลขออเดอร์จากภาพนี้ ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false} กฎ: 1) เลขออเดอร์คือเลขยาวๆใต้ชื่อ platform เช่น 260416IG9B3BBWB ไม่ใช่ ID สั้นๆ 2) ถ้าเห็นสติ๊กเกอร์ปิดทับบนตัวเลขทำให้อ่านไม่ครบให้ unclear:true 3) ถ้าภาพเบลอจนอ่านไม่ออกให้ unclear:true 4) ถ้าเห็นเลขชัดแม้ภาพจะเอียงให้อ่านได้เลย ห้ามเดาตัวเลขที่ไม่เห็น' }
+        { type: 'text', text: exampleText + 'ภาพอาจถ่ายมาเอียงหรือหมุน ให้อ่านข้อความในทุกทิศทาง อ่านเลขออเดอร์จากภาพนี้ ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false} กฎ: 1) เลขออเดอร์คือเลขยาวๆใต้ชื่อ platform เช่น 260416IG9B3BBWB ไม่ใช่ ID สั้นๆ 2) ถ้าเห็นสติ๊กเกอร์ปิดทับบนตัวเลขทำให้อ่านไม่ครบให้ unclear:true 3) ถ้าภาพเบลอจนอ่านไม่ออกให้ unclear:true 4) ถ้าเห็นเลขชัดแม้ภาพจะเอียงให้อ่านได้เลย ห้ามเดาตัวเลขที่ไม่เห็น' }
       ]}]
     });
 
@@ -310,6 +321,11 @@ if (data.unclear || data.order_numbers.length === 0) {
   }
 }
 
+lastImagePerGroup[groupId] = {
+  order_numbers: data.order_numbers,
+  status: status
+};
+
 const orderList = data.order_numbers.join('\n');
 await client.replyMessage({
   replyToken,
@@ -336,6 +352,10 @@ async function handleAdminQuestion(replyToken, question) {
   .from('knowledge')
   .select('*');
 
+      const { data: pricing } = await supabase
+  .from('pricing')
+  .select('*');
+
     const context = `
 ข้อมูลออเดอร์ล่าสุด 50 รายการ:
 ${JSON.stringify(orders)}
@@ -347,6 +367,9 @@ ${(stock || []).map(s => `${s.color_code} ${s.color_name}: ${s.quantity_remainin
 ${(knowledge || []).map(k => `[${k.category}] ${k.question}: ${k.answer}`).join('\n')}
 `;
 
+ข้อมูลราคาสินค้า:
+${(pricing || []).map(p => `[${p.category}] ${p.product_name}: ${p.price_per_unit} บาท/${p.unit} ${p.note || ''}`).join('\n')}
+
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1000,
@@ -356,6 +379,38 @@ ${(knowledge || []).map(k => `[${k.category}] ${k.question}: ${k.answer}`).join(
     await client.replyMessage({
       replyToken,
       messages: [{ type: 'text', text: response.content[0].text }]
+    });
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function handleFeedbackCorrect(replyToken, groupId, correctNum = null) {
+  try {
+    const last = lastImagePerGroup[groupId];
+    if (!last) {
+      await client.replyMessage({
+        replyToken,
+        messages: [{ type: 'text', text: '⚠️ ไม่พบภาพล่าสุดค่ะ' }]
+      });
+      return;
+    }
+
+    const orderNum = correctNum || last.order_numbers[0];
+    await supabase.from('order_examples').insert([{
+      correct_order_number: orderNum,
+      note: correctNum ? 'แก้ไขจากที่บอทอ่านผิด' : 'บอทอ่านถูก'
+    }]);
+
+    if (correctNum) {
+      await supabase.from('orders')
+        .update({ status: last.status, status_updated_at: new Date().toISOString() })
+        .eq('order_number', correctNum);
+    }
+
+    await client.replyMessage({
+      replyToken,
+      messages: [{ type: 'text', text: `✅ บันทึกตัวอย่างแล้วค่ะ ออเดอร์: ${orderNum}` }]
     });
   } catch (err) {
     console.error(err);
