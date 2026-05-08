@@ -81,8 +81,8 @@ async function handleImage(replyToken, messageId) {
     const imageBuffer = Buffer.from(arrayBuffer);
     const workCompressedBuffer = await sharp(imageBuffer)
   .rotate()
-  .resize(600, 600, { fit: 'inside' })
-  .jpeg({ quality: 60 })
+  .resize(800, 800, { fit: 'inside' })
+  .jpeg({ quality: 70 })
   .toBuffer();
 const base64Image = workCompressedBuffer.toString('base64');
 
@@ -247,7 +247,7 @@ const base64Image = workCompressedBuffer.toString('base64');
       max_tokens: 200,
       messages: [{ role: 'user', content: [
         { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
-        { type: 'text', text: 'อ่านเลขออเดอร์จากภาพนี้ ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false} กฎเข้มงวด: 1) เลขออเดอร์คือเลขยาวๆใต้ platform ไม่ใช่ ID สั้นๆ 2) ถ้าตัวอักษรหรือตัวเลขใดถูกบัง ไม่ชัด หรือไม่แน่ใจแม้แต่ตัวเดียว ให้ unclear:true order_numbers:[] ทันที 3) ห้ามเดา ห้ามเติมตัวอักษรที่มองไม่เห็น 4) ถ้าเห็นสติ๊กเกอร์หรือสิ่งบังทับบนตัวเลข ให้ unclear:true ทันที' }
+        { type: 'text', text: 'อ่านเลขออเดอร์จากภาพนี้ ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false} กฎ: 1) เลขออเดอร์คือเลขยาวๆใต้ platform ไม่ใช่ ID สั้นๆ 2) ถ้าตัวอักษรถูกบังหรือไม่ชัดเจนจริงๆ ให้ unclear:true order_numbers:[] 3) ห้ามเดาตัวอักษรที่มองไม่เห็น 4) ถ้าภาพหมุนให้อ่านตามทิศทางที่ถูกต้อง 5) ถ้าเห็นเลขออเดอร์ชัดเจนแม้ภาพจะเอียงให้อ่านได้เลย' }
       ]}]
     });
 
