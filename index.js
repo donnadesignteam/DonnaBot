@@ -203,12 +203,19 @@ async function handleWorkImage(replyToken, messageId, groupId) {
     const arrayBuffer = await lineResponse.arrayBuffer();
     const imageBuffer = Buffer.from(arrayBuffer);
 
-    const metadata = await sharp(imageBuffer).metadata();
-const isLandscape = metadata.width > metadata.height;
-
 const metadata = await sharp(imageBuffer).metadata();
     const isLandscape = metadata.width > metadata.height;
     const base64Image = imageBuffer.toString('base64');
+
+const { data: examples } = await supabase
+      .from('order_examples')
+      .select('correct_order_number')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    const exampleText = examples && examples.length > 0
+      ? 'ตัวอย่างเลขออเดอร์จากร้านนี้: ' + examples.map(e => e.correct_order_number).join(', ') + ' '
+      : '';
 
     const content = [
       { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
