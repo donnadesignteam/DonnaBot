@@ -382,8 +382,16 @@ const cron = require('node-cron');
 
 cron.schedule('26 14 * * *', async () => {
   try {
-    const today = new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'numeric', year: 'numeric' });
-    const { data: orders } = await supabase.from('orders').select('order_number, status').gte('created_at', new Date().toISOString().split('T')[0]);
+    const now = new Date();
+const bangkokOffset = 7 * 60;
+const bangkokTime = new Date(now.getTime() + bangkokOffset * 60 * 1000);
+const todayStr = bangkokTime.toISOString().split('T')[0];
+const today = bangkokTime.getDate() + '/' + (bangkokTime.getMonth() + 1) + '/' + bangkokTime.getFullYear();
+
+const { data: orders } = await supabase
+  .from('orders')
+  .select('order_number, status, status_updated_at')
+  .gte('status_updated_at', todayStr);
 
     const cut = orders.filter(o => o.status === 'กำลังตัด').map(o => o.order_number).join('\n') || '-';
     const sew = orders.filter(o => o.status === 'กำลังเย็บ').map(o => o.order_number).join('\n') || '-';
