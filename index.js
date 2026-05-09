@@ -378,5 +378,22 @@ async function handleFeedbackCorrect(replyToken, groupId, correctNum = null) {
   }
 }
 
+const cron = require('node-cron');
+
+cron.schedule('26 14 * * *', async () => {
+  try {
+    const today = new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'numeric', year: 'numeric' });
+    const { data: orders } = await supabase.from('orders').select('order_number, status').gte('created_at', new Date().toISOString().split('T')[0]);
+
+    const cut = orders.filter(o => o.status === 'กำลังตัด').map(o => o.order_number).join('\n') || '-';
+    const sew = orders.filter(o => o.status === 'กำลังเย็บ').map(o => o.order_number).join('\n') || '-';
+    const iron = orders.filter(o => o.status === 'กำลังรีด').map(o => o.order_number).join('\n') || '-';
+
+    const msg = 'สรุปออเดอร์วันที่ ' + today + '\n\nออเดอร์ถึงช่างตัด\n' + cut + '\n\nออเดอร์ถึงงานเย็บ\n' + sew + '\n\nออเดอร์ถึงช่างรีด\n' + iron;
+
+    await client.pushMessage({ to: process.env.GROUP_ORDER, messages: [{ type: 'text', text: msg }] });
+  } catch (err) { console.error(err); }
+}, { timezone: 'Asia/Bangkok' });
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log('Server running on port ' + PORT));
