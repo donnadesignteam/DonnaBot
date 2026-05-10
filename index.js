@@ -268,26 +268,21 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
     const status = statusMap[groupId];
 
     for (const orderNum of data.order_numbers) {
-      const { data: found } = await supabase
-        .from('orders')
+      const { data: existing } = await supabase
+        .from('work_status')
         .select('id')
         .eq('order_number', orderNum)
         .limit(1);
 
-      const { data: existing } = await supabase
-  .from('work_status')
-  .select('id')
-  .eq('order_number', orderNum)
-  .limit(1);
-
-if (existing && existing.length > 0) {
-  await supabase.from('work_status')
-    .update({ status, status_updated_at: new Date().toISOString() })
-    .eq('order_number', orderNum);
-} else {
-  await supabase.from('work_status')
-    .insert([{ order_number: orderNum, status }]);
-}
+      if (existing && existing.length > 0) {
+        await supabase.from('work_status')
+          .update({ status, status_updated_at: new Date().toISOString() })
+          .eq('order_number', orderNum);
+      } else {
+        await supabase.from('work_status')
+          .insert([{ order_number: orderNum, status }]);
+      }
+    }
 
     lastImagePerGroup[groupId] = {
       order_numbers: data.order_numbers,
