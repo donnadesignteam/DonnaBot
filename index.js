@@ -217,8 +217,8 @@ async function handleOrderText(replyToken, text) {
     const parsed = JSON.parse(raw);
 
     const data = {
-      order_number,
-      customer_name,
+      order_number: customer_name,
+      customer_name: order_number,
       platform,
       order_date,
       status: 'รอคิว',
