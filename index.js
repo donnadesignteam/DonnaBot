@@ -185,10 +185,7 @@ async function handleOrderText(replyToken, text) {
 
     await supabase.from('orders').insert([data]);
 
-    await client.replyMessage({
-      replyToken,
-      messages: [{ type: 'text', text: '✅' }]
-    });
+  
   } catch (err) {
     console.error(err);
   }
