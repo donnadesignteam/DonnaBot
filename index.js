@@ -175,7 +175,7 @@ async function handleOrderText(replyToken, text) {
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1500,
-      messages: [{ role: 'user', content: 'อ่านข้อความออเดอร์นี้แล้วตอบเป็น JSON เท่านั้น ห้ามมี markdown {"order_number":"","customer_name":"","platform":"","order_date":"","note":"","items":[{"curtain_type":"","color_code":"","color_name":"","eye_color":"","rail_floors":"","rail_head":"","width":0,"height":0,"quantity":0,"unit":"ผืน"}]} order_number=เลข ID ลูกค้าหลัง platform ถ้าไม่มีให้ใช้ชื่อลูกค้าแทน, customer_name=เลขออเดอร์ยาวๆถ้าไม่มีให้ใช้ชื่อลูกค้าแทน, platform=Tiktok/Shopee/Facebook/LineOA/Lazada, order_date=วันที่ถ้าปีไม่ชัดใช้ 2026, items แยกทุกรายการ curtain_type=ประเภท rail_floors=จำนวนชั้นถ้าเป็นราง rail_head=หัวรางถ้ามี width/height อ่านเป็นเมตร ถ้าเป็นรางใส่แค่ width height=0\n\nข้อความ:\n' + text }]
+      messages: [{ role: 'user', content: 'อ่านข้อความออเดอร์นี้แล้วตอบเป็น JSON เท่านั้น ห้ามมี markdown {"order_number":"","customer_name":"","platform":"","order_date":"","note":"","items":[{"curtain_type":"","color_code":"","color_name":"","eye_color":"","rail_floors":"","rail_head":"","width":0,"height":0,"quantity":0,"unit":"ผืน"}]} order_number=เลข ID ลูกค้าหลัง platform ถ้าไม่มีให้ใช้ชื่อลูกค้าแทน, customer_name=เลขออเดอร์ยาวๆถ้าไม่มีให้ใช้ชื่อลูกค้าแทน, platform=Tiktok/Shopee/Facebook/LineOA/Lazada, order_date=วันที่ถ้าปีไม่ชัดใช้ 2026, items แยกทุกรายการ curtain_type=ประเภท rail_floors=จำนวนชั้นถ้าเป็นราง rail_head=หัวรางถ้ามี width/height อ่านเป็นเมตรให้ครบทุกหลักรวมทศนิยม เช่น ก1.39.25 หมายถึง 1.3925 เมตร ส2.69.5 หมายถึง 2.695 เมตร ถ้าเป็นรางใส่แค่ width height=0\n\nข้อความ:\n' + text }]
     });
 
     const raw = response.content[0].text;
@@ -329,7 +329,7 @@ async function handleAdminQuestion(replyToken, question) {
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1000,
-      messages: [{ role: 'user', content: context + '\n\nคำถาม: ' + question + '\n\nตอบเป็นภาษาไทยแบบเป็นกันเอง กระชับ ใช้หางเสียงว่า "ค่ะ" ห้ามใช้ markdown หรือ **ตัวหนา**' }]
+      messages: [{ role: 'user', content: context + '\n\nคำถาม: ' + question + '\n\nตอบเป็นภาษาไทยแบบเป็นกันเอง กระชับ ใช้หางเสียงว่า "ค่ะ" ห้ามใช้ markdown หรือ **ตัวหนา** ถ้ามีวันที่ส่งให้แสดงเป็น "ส่งก่อนวันที่ D/M/YYYY" ห้ามใช้คำว่า "ลูกค้าขอ"' }]
     });
 
     await client.replyMessage({
