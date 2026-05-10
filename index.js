@@ -178,39 +178,59 @@ async function handleOrderText(replyToken, text) {
     const hasPlatform = platforms.some(p => text.toLowerCase().includes(p));
     if (!hasPlatform) return;
 
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+
+    // หา platform และ order_number จาก regex
+    let platform = '';
+    let order_number = '';
+    let order_date = '';
+    let customer_name = '';
+
+    for (const line of lines) {
+      // หาวันที่
+      if (/\d{1,2}[\s\/\-]*(ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.)[\s\S]*\d{4}/.test(line)) {
+        order_date = line;
+        continue;
+      }
+      // หา platform และชื่อลูกค้า
+      const platformMatch = line.match(/^(shopee|tiktok|lazada|facebook|lineoa)\s*:\s*(.+)/i);
+      if (platformMatch) {
+        platform = platformMatch[1].charAt(0).toUpperCase() + platformMatch[1].slice(1).toLowerCase();
+        order_number = platformMatch[2].trim();
+        continue;
+      }
+      // หาเลขออเดอร์ (ตัวอักษรใหญ่+ตัวเลข หรือตัวเลขยาว)
+      if (/^[A-Z0-9]{10,}$/.test(line) || /^\d{10,}$/.test(line)) {
+        customer_name = customer_name ? customer_name + ',' + line : line;
+        continue;
+      }
+    }
+
+    // ให้ Claude อ่านแค่ items
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 8096,
-      messages: [{ role: 'user', content: 'อ่านข้อความออเดอร์นี้แล้วตอบเป็น JSON เท่านั้น ห้ามมี markdown {"order_number":"","customer_name":"","platform":"","order_date":"","note":"","items":[{"curtain_type":"","color_code":"","color_name":"","eye_color":"","rail_floors":"","rail_head":"","width":0,"height":0,"quantity":0,"unit":"ผืน"}]} order_number=เลขออเดอร์ทั้งหมดคั่นด้วย comma ถ้ามีหลายออเดอร์ เช่น "260427VHSUSA6K,2604293GTKSM35" ถ้ามีเลขเดียวใส่เลขเดียว, customer_name=ชื่อลูกค้าหลัง platform เช่น garoove, platform=Tiktok/Shopee/Facebook/LineOA/Lazada, order_date=วันที่ถ้าปีไม่ชัดใช้ 2026, items แยกทุกรายการ curtain_type=ประเภท rail_floors=จำนวนชั้นถ้าเป็นราง rail_head=หัวรางถ้ามี width/height อ่านเป็นเมตรให้ครบทุกหลักรวมทศนิยม เช่น ก1.39.25 หมายถึง 1.3925 เมตร ส2.69.5 หมายถึง 2.695 เมตร ถ้าเป็นรางใส่แค่ width height=0\n\nข้อความ:\n' + text }]
+      messages: [{ role: 'user', content: 'อ่านรายการสินค้าจากข้อความนี้แล้วตอบเป็น JSON เท่านั้น ห้ามมี markdown {"items":[{"curtain_type":"","color_code":"","color_name":"","eye_color":"","rail_floors":"","rail_head":"","width":0,"height":0,"quantity":0,"unit":"ผืน"}]} curtain_type=ประเภท rail_floors=จำนวนชั้นถ้าเป็นราง rail_head=หัวรางถ้ามี width/height อ่านเป็นเมตร ถ้าเป็นรางใส่แค่ width height=0 unit=ผืนหรือชุด\n\nข้อความ:\n' + text }]
     });
 
-    const raw = response.content[0].text;
-    const cleaned = raw.replace(/```json|```/g, '').trim();
-    const data = JSON.parse(cleaned);
-    data.status = 'รอคิว';
+    const raw = response.content[0].text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(raw);
 
-    // แยก customer name กับ order number จาก text จริงๆ
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-    const platformLine = lines.find(l => /shopee|tiktok|lazada|facebook|lineoa/i.test(l));
-    if (platformLine) {
-      const parts = platformLine.split(':');
-      if (parts.length > 1) {
-        data.order_number = parts[1].trim();
-      }
-    }
-    const orderNumLine = lines.find(l => /^[A-Z0-9]{10,}$/.test(l) || /^\d{10,}$/.test(l));
-    if (orderNumLine) {
-      data.customer_name = orderNumLine.trim();
-    }
-    console.log('lines:', JSON.stringify(lines));
-    console.log('platformLine:', platformLine);
-    console.log('orderNumLine:', orderNumLine);
+    const data = {
+      order_number,
+      customer_name,
+      platform,
+      order_date,
+      status: 'รอคิว',
+      note: '',
+      items: parsed.items
+    };
 
     await supabase.from('orders').insert([data]);
+    console.log('order saved:', order_number, customer_name);
 
-  
   } catch (err) {
-    console.error(err);
+    console.error('handleOrderText error:', err);
   }
 }
 
