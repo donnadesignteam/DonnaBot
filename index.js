@@ -442,8 +442,6 @@ async function handleOrderAction(replyToken, text) {
       .eq('order_number', orderNum);
 
     console.log('updated order:', orderNum);
-
-    console.log('updated order:', orderNum);
   } catch (err) {
     console.error(err);
   }
