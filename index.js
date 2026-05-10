@@ -421,7 +421,7 @@ async function handleFeedbackCorrect(replyToken, groupId, correctNum = null) {
 
 const cron = require('node-cron');
 
-cron.schedule('05 16 * * *', async () => {
+cron.schedule('25 20 * * *', async () => {
   try {
     const now = new Date();
 const bangkokOffset = 7 * 60;
@@ -438,7 +438,7 @@ const { data: orders } = await supabase
     const sew = orders.filter(o => o.status === 'กำลังเย็บ').map(o => o.order_number).join('\n') || '-';
     const iron = orders.filter(o => o.status === 'กำลังรีด').map(o => o.order_number).join('\n') || '-';
 
-    const msg = 'สรุปออเดอร์วันที่ ' + today + '\n\nออเดอร์ถึงช่างตัด\n' + cut + '\n\nออเดอร์ถึงงานเย็บ\n' + sew + '\n\nออเดอร์ถึงช่างรีด\n' + iron;
+    const msg = 'Test สรุปออเดอร์วันที่ ' + today + '\n\nออเดอร์ถึงช่างตัด\n' + cut + '\n\nออเดอร์ถึงงานเย็บ\n' + sew + '\n\nออเดอร์ถึงช่างรีด\n' + iron;
 
     await client.pushMessage({ to: process.env.GROUP_ORDER, messages: [{ type: 'text', text: msg }] });
   } catch (err) { console.error(err); }
