@@ -215,6 +215,7 @@ async function handleOrderText(replyToken, text) {
     });
 
     const raw = response.content[0].text.replace(/```json|```/g, '').trim();
+    console.log('order items raw:', raw);
     const parsed = JSON.parse(raw);
 
     const data = {
