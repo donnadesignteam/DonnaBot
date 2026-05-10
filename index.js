@@ -191,9 +191,6 @@ async function handleOrderText(replyToken, text) {
 
     // แยก customer name กับ order number จาก text จริงๆ
     const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-    console.log('lines:', JSON.stringify(lines));
-    console.log('platformLine:', platformLine);
-    console.log('orderNumLine:', orderNumLine);
     const platformLine = lines.find(l => /shopee|tiktok|lazada|facebook|lineoa/i.test(l));
     if (platformLine) {
       const parts = platformLine.split(':');
@@ -205,6 +202,9 @@ async function handleOrderText(replyToken, text) {
     if (orderNumLine) {
       data.customer_name = orderNumLine.trim();
     }
+    console.log('lines:', JSON.stringify(lines));
+    console.log('platformLine:', platformLine);
+    console.log('orderNumLine:', orderNumLine);
 
     await supabase.from('orders').insert([data]);
 
