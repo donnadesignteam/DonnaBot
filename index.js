@@ -379,7 +379,7 @@ async function handleFeedbackCorrect(replyToken, groupId, correctNum = null) {
 
 const cron = require('node-cron');
 
-cron.schedule('06 15 * * *', async () => {
+cron.schedule('38 12 * * *', async () => {
   try {
     const now = new Date();
 const bangkokOffset = 7 * 60;
