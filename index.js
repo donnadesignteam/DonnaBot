@@ -464,9 +464,6 @@ async function handleOrderAction(replyToken, text) {
   }
 }
 
-console.log('before override - order_number:', data.order_number, 'customer_name:', data.customer_name);
-    // regex code here
-    console.log('after override - order_number:', data.order_number, 'customer_name:', data.customer_name);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log('Server running on port ' + PORT));
