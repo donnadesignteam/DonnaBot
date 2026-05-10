@@ -274,16 +274,20 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
         .eq('order_number', orderNum)
         .limit(1);
 
-      if (found && found.length > 0) {
-        await supabase.from('orders')
-          .update({ status, status_updated_at: new Date().toISOString() })
-          .eq('order_number', orderNum);
-      } else {
-        await supabase.from('orders')
-          .update({ status, status_updated_at: new Date().toISOString() })
-          .eq('customer_name', orderNum);
-      }
-    }
+      const { data: existing } = await supabase
+  .from('work_status')
+  .select('id')
+  .eq('order_number', orderNum)
+  .limit(1);
+
+if (existing && existing.length > 0) {
+  await supabase.from('work_status')
+    .update({ status, status_updated_at: new Date().toISOString() })
+    .eq('order_number', orderNum);
+} else {
+  await supabase.from('work_status')
+    .insert([{ order_number: orderNum, status }]);
+}
 
     lastImagePerGroup[groupId] = {
       order_numbers: data.order_numbers,
@@ -389,9 +393,9 @@ const todayStr = bangkokTime.toISOString().split('T')[0];
 const today = bangkokTime.getDate() + '/' + (bangkokTime.getMonth() + 1) + '/' + bangkokTime.getFullYear();
 
 const { data: orders } = await supabase
-  .from('orders')
-  .select('order_number, status, status_updated_at')
-  .gte('status_updated_at', todayStr);
+  .from('work_status')
+  .select('order_number, status')
+  .in('status', ['กำลังตัด', 'กำลังเย็บ', 'กำลังรีด']);
 
     const cut = orders.filter(o => o.status === 'กำลังตัด').map(o => o.order_number).join('\n') || '-';
     const sew = orders.filter(o => o.status === 'กำลังเย็บ').map(o => o.order_number).join('\n') || '-';
