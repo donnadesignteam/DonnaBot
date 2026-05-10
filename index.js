@@ -422,18 +422,26 @@ async function handleOrderAction(replyToken, text) {
       return;
     }
 
+    const { data: order } = await supabase
+      .from('orders')
+      .select('items, note, color_code, order_date')
+      .eq('order_number', orderNum)
+      .single();
+
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 500,
-      messages: [{ role: 'user', content: 'อ่านข้อความนี้แล้วบอกว่าต้องแก้ไขข้อมูลอะไรของออเดอร์ ตอบเป็น JSON เท่านั้น {"field":"","value":""} field คือชื่อคอลัมน์ที่ต้องแก้ เช่น color_code, note, order_date, status ข้อความ: ' + text }]
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: 'ข้อมูลออเดอร์ปัจจุบัน: ' + JSON.stringify(order) + '\n\nข้อความแก้ไข: ' + text + '\n\nแก้ไขข้อมูลตามที่ระบุแล้วตอบเป็น JSON เดียวกันที่แก้แล้ว ห้ามมี markdown' }]
     });
 
     const raw = response.content[0].text.replace(/```json|```/g, '').trim();
-    const action = JSON.parse(raw);
+    const updated = JSON.parse(raw);
 
     await supabase.from('orders')
-      .update({ [action.field]: action.value })
+      .update(updated)
       .eq('order_number', orderNum);
+
+    console.log('updated order:', orderNum);
 
     console.log('updated:', orderNum, action.field, action.value);
   } catch (err) {
