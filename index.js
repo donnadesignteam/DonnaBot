@@ -146,7 +146,7 @@ async function handleImage(replyToken, messageId) {
       replyToken,
       messages: [{
         type: 'text',
-        text: '✅ บันทึกแล้วครับ\nวันที่: ' + data.order_date +
+        text: '✅ บันทึกแล้วค่ะ\nวันที่: ' + data.order_date +
           '\nช่องทาง: ' + data.platform +
           '\nลูกค้า: ' + data.order_number +
           '\nออเดอร์: ' + data.customer_name +
@@ -160,7 +160,7 @@ async function handleImage(replyToken, messageId) {
     console.error(err);
     await client.replyMessage({
       replyToken,
-      messages: [{ type: 'text', text: '❌ อ่านใบงานไม่ได้ กรุณาส่งใหม่อีกครั้งครับ' }],
+      messages: [{ type: 'text', text: '❌ อ่านใบงานไม่ได้ กรุณาส่งใหม่อีกครั้งค่ะ' }],
     });
   }
 }
@@ -292,7 +292,7 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
     const orderList = data.order_numbers.join('\n');
     await client.replyMessage({
       replyToken,
-      messages: [{ type: 'text', text: '✅ บันทึกแล้วครับ\nออเดอร์:\n' + orderList + '\nสถานะ: ' + status }]
+      messages: [{ type: 'text', text: '✅ บันทึกแล้วค่ะ\nออเดอร์:\n' + orderList + '\nสถานะ: ' + status }]
     });
   } catch (err) {
     console.error(err);
@@ -379,7 +379,7 @@ async function handleFeedbackCorrect(replyToken, groupId, correctNum = null) {
 
 const cron = require('node-cron');
 
-cron.schedule('38 12 * * *', async () => {
+cron.schedule('50 12 * * *', async () => {
   try {
     const now = new Date();
 const bangkokOffset = 7 * 60;
