@@ -198,7 +198,7 @@ async function handleOrderText(replyToken, text) {
         data.order_number = parts[1].trim();
       }
     }
-    const orderNumLine = lines.find(l => /^[A-Z0-9]{10,}$/.test(l) || /^\d{15,}$/.test(l));
+    const orderNumLine = lines.find(l => /^[A-Z0-9]{10,}$/.test(l) || /^\d{10,}$/.test(l));
     if (orderNumLine) {
       data.customer_name = orderNumLine.trim();
     }
@@ -463,6 +463,10 @@ async function handleOrderAction(replyToken, text) {
     console.error(err);
   }
 }
+
+console.log('before override - order_number:', data.order_number, 'customer_name:', data.customer_name);
+    // regex code here
+    console.log('after override - order_number:', data.order_number, 'customer_name:', data.customer_name);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log('Server running on port ' + PORT));
