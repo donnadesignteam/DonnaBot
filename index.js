@@ -422,7 +422,7 @@ async function handleFeedbackCorrect(replyToken, groupId, correctNum = null) {
 const cron = require('node-cron');
 
 console.log('cron registered');
-cron.schedule('61 20 * * *', async () => {
+cron.schedule('04 21 * * *', async () => {
   console.log('cron fired');
   try {
     const now = new Date();
