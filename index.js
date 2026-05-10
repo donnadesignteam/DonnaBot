@@ -200,8 +200,9 @@ async function handleOrderText(replyToken, text) {
         continue;
       }
       // หาเลขออเดอร์ (ตัวอักษรใหญ่+ตัวเลข หรือตัวเลขยาว)
-      if (/^[A-Z0-9]{10,}$/.test(line) || /^\d{10,}$/.test(line)) {
-        customer_name = customer_name ? customer_name + ',' + line : line;
+      const cleanLine = line.split(/[\s📍✅🔥]/)[0].trim();
+      if (cleanLine.length >= 10 && (/^[A-Z0-9]{10,}$/.test(cleanLine) || /^\d{10,}$/.test(cleanLine))) {
+        customer_name = customer_name ? customer_name + ',' + cleanLine : cleanLine;
         continue;
       }
     }
