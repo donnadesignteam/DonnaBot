@@ -422,7 +422,7 @@ async function handleFeedbackCorrect(replyToken, groupId, correctNum = null) {
 const cron = require('node-cron');
 
 console.log('cron registered');
-cron.schedule('04 21 * * *', async () => {
+cron.schedule('00 19 * * *', async () => {
   console.log('cron fired');
   try {
     const now = new Date();
@@ -440,7 +440,7 @@ const { data: orders } = await supabase
     const sew = orders.filter(o => o.status === 'กำลังเย็บ').map(o => o.order_number).join('\n') || '-';
     const iron = orders.filter(o => o.status === 'กำลังรีด').map(o => o.order_number).join('\n') || '-';
 
-    const msg = 'Test สรุปออเดอร์วันที่ ' + today + '\n\nออเดอร์ถึงช่างตัด\n' + cut + '\n\nออเดอร์ถึงงานเย็บ\n' + sew + '\n\nออเดอร์ถึงช่างรีด\n' + iron;
+    const msg = 'สรุปออเดอร์วันที่ ' + today + '\n\nออเดอร์ถึงช่างตัด\n' + cut + '\n\nออเดอร์ถึงงานเย็บ\n' + sew + '\n\nออเดอร์ถึงช่างรีด\n' + iron;
 
     await client.pushMessage({ to: process.env.GROUP_ADMIN, messages: [{ type: 'text', text: msg }] });
   } catch (err) { console.error(err); }
