@@ -189,6 +189,20 @@ async function handleOrderText(replyToken, text) {
     const data = JSON.parse(cleaned);
     data.status = 'รอคิว';
 
+    // แยก customer name กับ order number จาก text จริงๆ
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+    const platformLine = lines.find(l => /shopee|tiktok|lazada|facebook|lineoa/i.test(l));
+    if (platformLine) {
+      const parts = platformLine.split(':');
+      if (parts.length > 1) {
+        data.order_number = parts[1].trim();
+      }
+    }
+    const orderNumLine = lines.find(l => /^[A-Z0-9]{10,}$/.test(l) || /^\d{15,}$/.test(l));
+    if (orderNumLine) {
+      data.customer_name = orderNumLine.trim();
+    }
+
     await supabase.from('orders').insert([data]);
 
   
