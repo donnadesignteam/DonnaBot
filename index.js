@@ -56,7 +56,13 @@ async function handleEvent(event) {
   // กลุ่มแผนกออเดอร์ — อ่าน text บันทึกออเดอร์
   if (groupId === GROUP_ORDER) {
     if (message.type === 'text') {
-      await handleOrderText(replyToken, message.text);
+      const text = message.text.trim();
+      const orderMatch = text.match(/[A-Z0-9]{10,}/);
+      if (orderMatch && (text.includes('ยกเลิก') || text.includes('แก้') || text.includes('เปลี่ยน'))) {
+        await handleOrderAction(replyToken, text);
+        return;
+      }
+      await handleOrderText(replyToken, text);
     }
     return;
   }
@@ -398,6 +404,42 @@ const { data: orders } = await supabase
     await client.pushMessage({ to: process.env.GROUP_ORDER, messages: [{ type: 'text', text: msg }] });
   } catch (err) { console.error(err); }
 }, { timezone: 'Asia/Bangkok' });
+
+async function handleOrderAction(replyToken, text) {
+  try {
+    const match = text.match(/[A-Z0-9]{10,}/);
+    if (!match) return;
+    const orderNum = match[0];
+
+    if (text.includes('ยกเลิก')) {
+      await supabase.from('orders')
+        .update({ status: 'ยกเลิก' })
+        .eq('order_number', orderNum);
+      await supabase.from('work_status')
+        .update({ status: 'ยกเลิก' })
+        .eq('order_number', orderNum);
+      console.log('cancelled:', orderNum);
+      return;
+    }
+
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 500,
+      messages: [{ role: 'user', content: 'อ่านข้อความนี้แล้วบอกว่าต้องแก้ไขข้อมูลอะไรของออเดอร์ ตอบเป็น JSON เท่านั้น {"field":"","value":""} field คือชื่อคอลัมน์ที่ต้องแก้ เช่น color_code, note, order_date, status ข้อความ: ' + text }]
+    });
+
+    const raw = response.content[0].text.replace(/```json|```/g, '').trim();
+    const action = JSON.parse(raw);
+
+    await supabase.from('orders')
+      .update({ [action.field]: action.value })
+      .eq('order_number', orderNum);
+
+    console.log('updated:', orderNum, action.field, action.value);
+  } catch (err) {
+    console.error(err);
+  }
+}
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log('Server running on port ' + PORT));
