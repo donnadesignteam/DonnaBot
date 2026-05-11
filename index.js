@@ -43,6 +43,7 @@ async function handleEvent(event) {
   const GROUP_SEW = process.env.GROUP_SEW;
   const GROUP_IRON = process.env.GROUP_IRON;
   const GROUP_ADMIN = process.env.GROUP_ADMIN;
+  const GROUP_PACK = process.env.GROUP_PACK;
 
   // กลุ่มแอดมิน — ตอบคำถาม @บอท
   if (groupId === GROUP_ADMIN) {
@@ -67,8 +68,8 @@ async function handleEvent(event) {
     return;
   }
 
-  // กลุ่มช่าง 3 กลุ่ม — อ่านภาพดูเลขออเดอร์
-  if ([GROUP_CUT, GROUP_SEW, GROUP_IRON].includes(groupId)) {
+  // กลุ่มช่าง 4 กลุ่ม — อ่านภาพดูเลขออเดอร์
+  if ([GROUP_CUT, GROUP_SEW, GROUP_IRON, GROUP_PACK].includes(groupId)) {
     if (message.type === 'image') {
       await handleWorkImage(replyToken, message.id, groupId);
       return;
@@ -305,7 +306,8 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
     const statusMap = {
       [process.env.GROUP_CUT]: 'กำลังตัด',
       [process.env.GROUP_SEW]: 'กำลังเย็บ',
-      [process.env.GROUP_IRON]: 'กำลังรีด'
+      [process.env.GROUP_IRON]: 'กำลังรีด',
+      [process.env.GROUP_PACK]: 'กำลังแพ็ค'
     };
     const status = statusMap[groupId];
 
