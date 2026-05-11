@@ -332,9 +332,11 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
     };
 
     const orderList = data.order_numbers.join('\n');
+    const bangkokTime = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
+    const dateStr = bangkokTime.getDate() + '/' + (bangkokTime.getMonth() + 1) + '/' + bangkokTime.getFullYear();
     await client.replyMessage({
       replyToken,
-      messages: [{ type: 'text', text: '✅ บันทึกแล้วค่ะ\nออเดอร์:\n' + orderList + '\nสถานะ: ' + status }]
+      messages: [{ type: 'text', text: '✅ บันทึกแล้วค่ะ\nวันที่: ' + dateStr + '\nออเดอร์:\n' + orderList + '\nสถานะ: ' + status }]
     });
   } catch (err) {
     console.error(err);
