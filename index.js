@@ -438,15 +438,18 @@ const today = bangkokTime.getDate() + '/' + (bangkokTime.getMonth() + 1) + '/' +
 const { data: orders } = await supabase
   .from('work_status')
   .select('order_number, status')
-  .in('status', ['กำลังตัด', 'กำลังเย็บ', 'กำลังรีด']);
+  .in('status', ['กำลังตัด', 'กำลังเย็บ', 'กำลังรีด', 'กำลังแพ็ค']);
 
     const cut = orders.filter(o => o.status === 'กำลังตัด').map(o => o.order_number).join('\n') || '-';
     const sew = orders.filter(o => o.status === 'กำลังเย็บ').map(o => o.order_number).join('\n') || '-';
     const iron = orders.filter(o => o.status === 'กำลังรีด').map(o => o.order_number).join('\n') || '-';
 
-    const msg = 'สรุปออเดอร์วันที่ ' + today + '\n\nออเดอร์ถึงช่างตัด\n' + cut + '\n\nออเดอร์ถึงงานเย็บ\n' + sew + '\n\nออเดอร์ถึงช่างรีด\n' + iron;
+    const pack = (orders || []).filter(o => o.status === 'กำลังแพ็ค').map(o => o.order_number).join('\n') || '-';
+
+    const msg = 'สรุปออเดอร์วันที่ ' + today + '\n\nออเดอร์ถึงช่างตัด\n' + cut + '\n\nออเดอร์ถึงงานเย็บ\n' + sew + '\n\nออเดอร์ถึงช่างรีด\n' + iron + '\n\nออเดอร์ถึงแพ็ค\n' + pack;
 
     await client.pushMessage({ to: process.env.GROUP_ADMIN, messages: [{ type: 'text', text: msg }] });
+    await client.pushMessage({ to: process.env.GROUP_PACK, messages: [{ type: 'text', text: 'สรุปออเดอร์วันที่ ' + today + '\n\nออเดอร์ถึงแพ็ค\n' + pack }] });
   } catch (err) { console.error(err); }
 }, { timezone: 'Asia/Bangkok' });
 
