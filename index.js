@@ -438,7 +438,8 @@ const today = bangkokTime.getDate() + '/' + (bangkokTime.getMonth() + 1) + '/' +
 const { data: orders } = await supabase
   .from('work_status')
   .select('order_number, status')
-  .in('status', ['กำลังตัด', 'กำลังเย็บ', 'กำลังรีด', 'กำลังแพ็ค']);
+  .in('status', ['กำลังตัด', 'กำลังเย็บ', 'กำลังรีด', 'กำลังแพ็ค'])
+  .gte('status_updated_at', todayStr);
 
     const cut = orders.filter(o => o.status === 'กำลังตัด').map(o => o.order_number).join('\n') || '-';
     const sew = orders.filter(o => o.status === 'กำลังเย็บ').map(o => o.order_number).join('\n') || '-';
