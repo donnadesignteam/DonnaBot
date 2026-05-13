@@ -180,6 +180,7 @@ async function handleOrderText(replyToken, text) {
   try {
     const platforms = ['shopee', 'tiktok', 'lineoa', 'lazada', 'facebook'];
     const hasPlatform = platforms.some(p => text.toLowerCase().includes(p));
+    console.log('hasPlatform:', hasPlatform, 'text:', text.substring(0, 50));
     if (!hasPlatform) return;
 
     const lines = text.split('\n').map(l => l.trim()).filter(l => l);
