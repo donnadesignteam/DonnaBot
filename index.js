@@ -6,6 +6,9 @@ const { createClient } = require('@supabase/supabase-js');
 const sharp = require('sharp');
 const app = express();
 
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+
 // Config
 const lineConfig = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
@@ -273,13 +276,13 @@ const { data: examples } = await supabase
 
     content.push({ type: 'text', text: exampleText + 'ส่งภาพ 2 เวอร์ชั่น ต้นฉบับและหมุน 270 องศา ให้เลือกเวอร์ชั่นที่อ่านเลขออเดอร์ได้ชัดที่สุด เลขออเดอร์อยู่บรรทัดที่ 3 ถัดจากวันที่และชื่อ platform+ลูกค้า รูปแบบเช่น 260417ZXA1VJVQ (Shopee ขึ้นต้นด้วย 26) หรือ 583866734348764827 (Tiktok เป็นตัวเลขล้วนยาว 18-19 หลักถัดจากชื่อลูกค้า) หรือ (Lazada เป็นตัวเลขยาว 1082651067631474) ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false,"use_customer_name":false} กฎ: 1) ไม่ใช่วันที่ 2) ไม่ใช่ชื่อลูกค้า 3) ถ้ามีสิ่งปิดทับบนตัวเลขออเดอร์โดยตรงจนอ่านไม่ออกให้ unclear:true แต่ถ้าเทปหรือสติ๊กเกอร์อยู่คนละบรรทัดกับเลขออเดอร์ให้อ่านได้ปกติ 4) ถ้าไม่มั่นใจให้ unclear:true 5) ห้ามเดา 6) ถ้าเลขออเดอร์โดนปิดหรือไม่มีเลยให้ใส่ platform_ชื่อลูกค้า แทนใน order_numbers เช่น "tiktok: AAA","Shopee: BBB","FB: CCC","Facebook: DDD","LineOA: EEE","Lazada: FFF" และ unclear:false ในกรณีนี้' });
 
-    const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 200,
-      messages: [{ role: 'user', content: content }]
-    });
-
-    const raw = response.content[0].text.replace(/```json|```/g, '').trim();
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const promptText = content.find(c => c.type === 'text').text;
+    const imageParts = content.filter(c => c.type === 'image').map(c => ({
+      inlineData: { data: c.source.data, mimeType: c.source.media_type }
+    }));
+    const geminiResponse = await model.generateContent([promptText, ...imageParts]);
+    const raw = geminiResponse.response.text().replace(/```json|```/g, '').trim();
     console.log('work image raw:', raw);
 
     let data;
