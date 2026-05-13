@@ -251,7 +251,11 @@ async function handleWorkImage(replyToken, messageId, groupId) {
 
 const metadata = await sharp(imageBuffer).metadata();
     const isLandscape = metadata.width > metadata.height;
-    const base64Image = imageBuffer.toString('base64');
+    const resizedBuffer = await sharp(imageBuffer)
+  .resize(800, 800, { fit: 'inside' })
+  .jpeg({ quality: 60 })
+  .toBuffer();
+const base64Image = resizedBuffer.toString('base64');
 
 const { data: examples } = await supabase
       .from('order_examples')
@@ -485,6 +489,7 @@ async function handleOrderAction(replyToken, text) {
       messages: [{ role: 'user', content: 'ข้อมูลออเดอร์ปัจจุบัน: ' + JSON.stringify(order) + '\n\nข้อความแก้ไข: ' + text + '\n\nแก้ไขข้อมูลตามที่ระบุแล้วตอบเป็น JSON เดียวกันที่แก้แล้ว ห้ามมี markdown' }]
     });
 
+    console.log('tokens used - input:', response.usage.input_tokens, 'output:', response.usage.output_tokens);
     const raw = response.content[0].text.replace(/```json|```/g, '').trim();
     const updated = JSON.parse(raw);
 
