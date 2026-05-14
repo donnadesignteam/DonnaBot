@@ -47,6 +47,7 @@ async function handleEvent(event) {
   const GROUP_IRON = process.env.GROUP_IRON;
   const GROUP_ADMIN = process.env.GROUP_ADMIN;
   const GROUP_PACK = process.env.GROUP_PACK;
+  const GROUP_SUPPLIER = process.env.GROUP_SUPPLIER;
 
   // กลุ่มแอดมิน — ตอบคำถาม @บอท
   if (groupId === GROUP_ADMIN) {
@@ -67,6 +68,18 @@ async function handleEvent(event) {
         return;
       }
       await handleOrderText(replyToken, text);
+    }
+    return;
+  }
+
+  if (groupId === GROUP_SUPPLIER) {
+    if (message.type === 'text') {
+      const text = message.text.trim();
+      if (text.includes('ของเข้าแล้ว') || text.includes('ได้รับแล้ว')) {
+        await handleSupplierUpdate(replyToken, text);
+      } else {
+        await handleSupplierOrder(replyToken, text);
+      }
     }
     return;
   }
@@ -503,6 +516,103 @@ async function handleOrderAction(replyToken, text) {
   }
 }
 
+async function handleSupplierOrder(replyToken, text) {
+  try {
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+    let customer_name = '';
+    let order_number = '';
+
+    for (const line of lines) {
+      const cleanLine = line.split(/[\s📍✅🔥·]/)[0].trim();
+      if (!order_number && cleanLine.length >= 10 && (/^[A-Z0-9]{10,}$/.test(cleanLine) || /^\d{12,}$/.test(cleanLine))) {
+        order_number = cleanLine;
+        continue;
+      }
+      if (!customer_name && cleanLine.length > 0 && cleanLine.length < 30 && !/^\d/.test(cleanLine)) {
+        customer_name = cleanLine;
+        continue;
+      }
+    }
+
+    if (!order_number && !customer_name) return;
+
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: 'อ่านรายการสินค้าจากข้อความนี้แล้วตอบเป็น JSON เท่านั้น ห้ามมี markdown {"note":"","items":[{"curtain_type":"","width":0,"height":0,"quantity":0,"unit":"ชุด"}]} note=หมายเหตุเช่นดึงขวาดึงซ้าย width/height อ่านเป็นเมตร ถ้ามีจุดสองตัวให้รวมเป็นทศนิยมเดียว\n\nข้อความ:\n' + text }]
+    });
+
+    const raw = response.content[0].text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(raw);
+
+    await supabase.from('supplier_orders').insert([{
+      customer_name,
+      order_number,
+      items: parsed.items,
+      note: parsed.note || '',
+      status: 'รอของ'
+    }]);
+
+    console.log('supplier order saved:', customer_name, order_number);
+  } catch (err) {
+    console.error('handleSupplierOrder error:', err);
+  }
+}
+
+async function handleSupplierUpdate(replyToken, text) {
+  try {
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+    let order_number = '';
+    let customer_name = '';
+
+    for (const line of lines) {
+      const cleanLine = line.split(/[\s📍✅🔥·]/)[0].trim();
+      if (!order_number && cleanLine.length >= 10 && (/^[A-Z0-9]{10,}$/.test(cleanLine) || /^\d{12,}$/.test(cleanLine))) {
+        order_number = cleanLine;
+        continue;
+      }
+      if (!customer_name && cleanLine.length > 0 && cleanLine.length < 30 && !/^\d/.test(cleanLine) && !cleanLine.includes('ของเข้า')) {
+        customer_name = cleanLine;
+        continue;
+      }
+    }
+
+    if (order_number) {
+      await supabase.from('supplier_orders')
+        .update({ status: 'ของเข้าแล้ว', updated_at: new Date().toISOString() })
+        .eq('order_number', order_number);
+    } else if (customer_name) {
+      await supabase.from('supplier_orders')
+        .update({ status: 'ของเข้าแล้ว', updated_at: new Date().toISOString() })
+        .eq('customer_name', customer_name);
+    }
+
+    console.log('supplier updated:', order_number || customer_name);
+  } catch (err) {
+    console.error('handleSupplierUpdate error:', err);
+  }
+}
+
+cron.schedule('0 8 * * *', async () => {
+  try {
+    const now = new Date();
+    const bangkokTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+    const threeDaysAgo = new Date(bangkokTime.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: pending } = await supabase
+      .from('supplier_orders')
+      .select('customer_name, order_number')
+      .eq('status', 'รอของ')
+      .lte('created_at', threeDaysAgo);
+
+    if (!pending || pending.length === 0) return;
+
+    const list = pending.map(o => o.order_number || o.customer_name).join('\n');
+    const msg = '‼️งานที่ยังไม่ได้อัพเดท‼️\n' + list;
+
+    await client.pushMessage({ to: process.env.GROUP_SUPPLIER, messages: [{ type: 'text', text: msg }] });
+  } catch (err) { console.error('supplier cron error:', err); }
+}, { timezone: 'Asia/Bangkok' });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log('Server running on port ' + PORT));
