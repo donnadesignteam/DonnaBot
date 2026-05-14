@@ -36,6 +36,10 @@ app.post('/webhook',
 );
 
 async function handleEvent(event) {
+  if (event.type === 'unsend') {
+    await handleUnsend(event);
+    return;
+  }
   if (event.type !== 'message') return;
   const { replyToken, message } = event;
   const groupId = event.source.groupId;
@@ -67,7 +71,7 @@ async function handleEvent(event) {
         await handleOrderAction(replyToken, text);
         return;
       }
-      await handleOrderText(replyToken, text);
+      await handleOrderText(replyToken, text, event.message.id);
     }
     return;
   }
@@ -189,7 +193,7 @@ async function handleImage(replyToken, messageId) {
 }
 
 // อ่าน text ออเดอร์จากกลุ่มแผนกออเดอร์
-async function handleOrderText(replyToken, text) {
+async function handleOrderText(replyToken, text, messageId = '') {
   try {
     const platforms = ['shopee', 'tiktok', 'lineoa', 'lazada', 'facebook'];
     const hasPlatform = platforms.some(p => text.toLowerCase().includes(p));
@@ -239,8 +243,10 @@ async function handleOrderText(replyToken, text) {
     const data = {
       order_number: customer_name,
       customer_name: order_number,
+      line_message_id: messageId,
       platform,
       order_date,
+      deadline: parsed.deadline || null,
       status: 'รอคิว',
       note: '',
       items: parsed.items
@@ -613,6 +619,29 @@ cron.schedule('0 8 * * *', async () => {
     await client.pushMessage({ to: process.env.GROUP_SUPPLIER, messages: [{ type: 'text', text: msg }] });
   } catch (err) { console.error('supplier cron error:', err); }
 }, { timezone: 'Asia/Bangkok' });
+
+async function handleUnsend(event) {
+  try {
+    const messageId = event.unsend.messageId;
+    const groupId = event.source.groupId;
+
+    if (groupId === process.env.GROUP_ORDER) {
+      await supabase.from('orders')
+        .delete()
+        .eq('line_message_id', messageId);
+      console.log('order deleted by unsend:', messageId);
+    }
+
+    if (groupId === process.env.GROUP_SUPPLIER) {
+      await supabase.from('supplier_orders')
+        .delete()
+        .eq('line_message_id', messageId);
+      console.log('supplier order deleted by unsend:', messageId);
+    }
+  } catch (err) {
+    console.error('handleUnsend error:', err);
+  }
+}
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log('Server running on port ' + PORT));
