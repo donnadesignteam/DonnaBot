@@ -610,6 +610,8 @@ cron.schedule('0 8 * * *', async () => {
   try {
     const now = new Date();
     const bangkokTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+
+    // แจ้งเตือนซัพพลายเออร์ค้างเกิน 3 วัน
     const threeDaysAgo = bangkokTime.toISOString().split('T')[0];
     const checkDate = new Date(threeDaysAgo);
     checkDate.setDate(checkDate.getDate() - 3);
@@ -621,13 +623,31 @@ cron.schedule('0 8 * * *', async () => {
       .eq('status', 'รอของ')
       .lte('created_at', threeDaysAgoStr + 'T23:59:59+07:00');
 
-    if (!pending || pending.length === 0) return;
+    if (pending && pending.length > 0) {
+      const list = pending.map(o => o.order_number || o.customer_name).join('\n');
+      const msg = '‼️งานที่ยังไม่ได้อัพเดท‼️\n' + list;
+      await client.pushMessage({ to: process.env.GROUP_SUPPLIER, messages: [{ type: 'text', text: msg }] });
+    }
 
-    const list = pending.map(o => o.order_number || o.customer_name).join('\n');
-    const msg = '‼️งานที่ยังไม่ได้อัพเดท‼️\n' + list;
+    // แจ้งเตือน deadline วันนี้
+    const todayStr = bangkokTime.toISOString().split('T')[0];
+    const { data: deadlineOrders } = await supabase
+      .from('orders')
+      .select('order_number, deadline')
+      .like('deadline', todayStr + '%')
+      .neq('status', 'ยกเลิก');
 
-    await client.pushMessage({ to: process.env.GROUP_SUPPLIER, messages: [{ type: 'text', text: msg }] });
-  } catch (err) { console.error('supplier cron error:', err); }
+    if (deadlineOrders && deadlineOrders.length > 0) {
+      const d = bangkokTime.getDate() + '/' + (bangkokTime.getMonth() + 1) + '/' + String(bangkokTime.getFullYear()).slice(2);
+      const orderList = deadlineOrders.map(o => {
+        const time = o.deadline && o.deadline.includes(' ') ? o.deadline.split(' ')[1] : '';
+        return o.order_number + (time ? ' ' + time : '');
+      }).join('\n');
+      const msg = '🔥🔥ออเดอร์ส่งด่วนภายในวันนี้ ' + d + '🔥🔥\n' + orderList;
+      await client.pushMessage({ to: process.env.GROUP_ORDER, messages: [{ type: 'text', text: msg }] });
+    }
+
+  } catch (err) { console.error('cron 8am error:', err); }
 }, { timezone: 'Asia/Bangkok' });
 
 async function handleUnsend(event) {
