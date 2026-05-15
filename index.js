@@ -233,7 +233,7 @@ async function handleOrderText(replyToken, text, messageId = '') {
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 8096,
-      messages: [{ role: 'user', content: 'อ่านรายการสินค้าจากข้อความนี้แล้วตอบเป็น JSON เท่านั้น ห้ามมี markdown {"items":[{"curtain_type":"","color_code":"","color_name":"","eye_color":"","rail_floors":"","rail_head":"","width":0,"height":0,"quantity":0,"unit":"ผืน"}]} curtain_type=ประเภท rail_floors=จำนวนชั้นถ้าเป็นราง rail_head=หัวรางถ้ามี width/height อ่านเป็นเมตรให้ครบทุกหลัก เช่น ก1.617=1.617 ส2.53.5=2.535 ส2.69.5=2.695 ถ้ามีจุดสองตัวให้รวมเป็นทศนิยมเดียว ถ้าเป็นรางใส่แค่ width height=0 unit=ผืนหรือชุด\n\nข้อความ:\n' + text }]
+      messages: [{ role: 'user', content: 'อ่านรายการสินค้าและวันส่งจากข้อความนี้แล้วตอบเป็น JSON เท่านั้น ห้ามมี markdown {"deadline":"","items":[{"curtain_type":"","color_code":"","color_name":"","eye_color":"","rail_floors":"","rail_head":"","width":0,"height":0,"quantity":0,"unit":"ผืน"}]} deadline=วันส่งก่อนที่ระบุด้วยคำว่า "ส่งก่อน" หรือ "ส่งภายใน" หรือ "ขอเร่งภายใน" รูปแบบ YYYY-MM-DD ถ้าไม่มีใส่ว่าง, curtain_type=ประเภท rail_floors=จำนวนชั้นถ้าเป็นราง rail_head=หัวรางถ้ามี width/height อ่านเป็นเมตรให้ครบทุกหลัก เช่น ก1.617=1.617 ส2.53.5=2.535 ถ้ามีจุดสองตัวให้รวมเป็นทศนิยมเดียว ถ้าเป็นรางใส่แค่ width height=0 unit=ผืนหรือชุด\n\nข้อความ:\n' + text }]
     });
 
     const raw = response.content[0].text.replace(/```json|```/g, '').trim();
@@ -252,7 +252,9 @@ async function handleOrderText(replyToken, text, messageId = '') {
       items: parsed.items
     };
 
-    await supabase.from('orders').insert([data]);
+    const { data: inserted, error: insertError } = await supabase.from('orders').insert([data]);
+    console.log('insert result:', inserted);
+    console.log('insert error:', insertError);
     console.log('order saved:', order_number, customer_name);
 
   } catch (err) {
