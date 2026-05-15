@@ -79,7 +79,7 @@ async function handleEvent(event) {
   if (groupId === GROUP_SUPPLIER) {
     if (message.type === 'text') {
       const text = message.text.trim();
-      if (text.includes('ของเข้าแล้ว') || text.includes('ได้รับแล้ว')) {
+      if (text.includes('ของเข้า') || text.includes('ได้รับแล้ว') || text.includes('เข้าแล้ว') || text === 'เข้า') {
         await handleSupplierUpdate(replyToken, text);
       } else {
         await handleSupplierOrder(replyToken, text, event.message.id);
