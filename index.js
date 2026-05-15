@@ -82,7 +82,7 @@ async function handleEvent(event) {
       if (text.includes('ของเข้าแล้ว') || text.includes('ได้รับแล้ว')) {
         await handleSupplierUpdate(replyToken, text);
       } else {
-        await handleSupplierOrder(replyToken, text);
+        await handleSupplierOrder(replyToken, text, event.message.id);
       }
     }
     return;
@@ -522,7 +522,7 @@ async function handleOrderAction(replyToken, text) {
   }
 }
 
-async function handleSupplierOrder(replyToken, text) {
+async function handleSupplierOrder(replyToken, text, messageId = '') {
   try {
     const lines = text.split('\n').map(l => l.trim()).filter(l => l);
     let customer_name = '';
@@ -555,6 +555,7 @@ async function handleSupplierOrder(replyToken, text) {
       customer_name,
       order_number,
       supplier: parsed.supplier || '',
+      line_message_id: messageId,
       items: parsed.items,
       note: parsed.note || '',
       status: 'รอของ'
