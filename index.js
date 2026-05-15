@@ -545,7 +545,7 @@ async function handleSupplierOrder(replyToken, text) {
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1000,
-      messages: [{ role: 'user', content: 'อ่านรายการสินค้าจากข้อความนี้แล้วตอบเป็น JSON เท่านั้น ห้ามมี markdown {"note":"","items":[{"curtain_type":"","width":0,"height":0,"quantity":0,"unit":"ชุด"}]} note=หมายเหตุเช่นดึงขวาดึงซ้าย width/height อ่านเป็นเมตร ถ้ามีจุดสองตัวให้รวมเป็นทศนิยมเดียว\n\nข้อความ:\n' + text }]
+      messages: [{ role: 'user', content: 'อ่านรายการสินค้าจากข้อความนี้แล้วตอบเป็น JSON เท่านั้น ห้ามมี markdown {"supplier":"","note":"","items":[{"curtain_type":"","width":0,"height":0,"quantity":0,"unit":"ชุด"}]} supplier=ชื่อหรือตัวย่อบริษัทที่สั่ง เช่น Kv, CK, KC ถ้าไม่มีใส่ว่าง note=หมายเหตุ unit=หน่วยนับที่ระบุในข้อความ เช่น ชุด ถุง อัน ม้วน โหล กล่อง ถ้าไม่มีให้ใส่ ชิ้น\n\nข้อความ:\n' + text }]
     });
 
     const raw = response.content[0].text.replace(/```json|```/g, '').trim();
@@ -554,6 +554,7 @@ async function handleSupplierOrder(replyToken, text) {
     await supabase.from('supplier_orders').insert([{
       customer_name,
       order_number,
+      supplier: parsed.supplier || '',
       items: parsed.items,
       note: parsed.note || '',
       status: 'รอของ'
