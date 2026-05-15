@@ -610,13 +610,16 @@ cron.schedule('0 8 * * *', async () => {
   try {
     const now = new Date();
     const bangkokTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-    const threeDaysAgo = new Date(bangkokTime.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    const threeDaysAgo = bangkokTime.toISOString().split('T')[0];
+    const checkDate = new Date(threeDaysAgo);
+    checkDate.setDate(checkDate.getDate() - 3);
+    const threeDaysAgoStr = checkDate.toISOString().split('T')[0];
 
     const { data: pending } = await supabase
       .from('supplier_orders')
       .select('customer_name, order_number')
       .eq('status', 'รอของ')
-      .lte('created_at', threeDaysAgo);
+      .lte('created_at', threeDaysAgoStr + 'T23:59:59+07:00');
 
     if (!pending || pending.length === 0) return;
 
