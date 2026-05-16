@@ -556,6 +556,13 @@ async function handleSupplierOrder(replyToken, text, messageId = '') {
     const raw = response.content[0].text.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(raw);
 
+    const hasItems = Array.isArray(parsed.items) && parsed.items.length > 0 &&
+      parsed.items.some(item => item.curtain_type || item.quantity > 0);
+    if (!hasItems) {
+      console.log('no order items found, skipping save');
+      return;
+    }
+
     await supabase.from('supplier_orders').insert([{
       customer_name,
       order_number,
