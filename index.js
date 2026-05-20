@@ -305,11 +305,24 @@ const { data: examples } = await supabase
 
     content.push({ type: 'text', text: exampleText + 'ส่งภาพ 2 เวอร์ชั่น ต้นฉบับและหมุน 270 องศา ให้เลือกเวอร์ชั่นที่อ่านเลขออเดอร์ได้ชัดที่สุด เลขออเดอร์อยู่บรรทัดที่ 3 ถัดจากวันที่และชื่อ platform+ลูกค้า รูปแบบเช่น 260417ZXA1VJVQ (Shopee ขึ้นต้นด้วย 26) หรือ 583866734348764827 (Tiktok เป็นตัวเลขล้วนยาว 18-19 หลักถัดจากชื่อลูกค้า) หรือ (Lazada เป็นตัวเลขยาว 1082651067631474) ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false,"use_customer_name":false} กฎ: 1) ไม่ใช่วันที่ 2) ไม่ใช่ชื่อลูกค้า 3) ถ้ามีสิ่งปิดทับบนตัวเลขออเดอร์โดยตรงจนอ่านไม่ออกให้ unclear:true แต่ถ้าเทปหรือสติ๊กเกอร์อยู่คนละบรรทัดกับเลขออเดอร์ให้อ่านได้ปกติ 4) ถ้าไม่มั่นใจให้ unclear:true 5) ห้ามเดา 6) ถ้าเลขออเดอร์โดนปิดหรือไม่มีเลยให้ใส่ platform_ชื่อลูกค้า แทนใน order_numbers เช่น "tiktok: AAA","Shopee: BBB","FB: CCC","Facebook: DDD","LineOA: EEE","Lazada: FFF" และ unclear:false ในกรณีนี้' });
 
-    const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 100,
-      messages: [{ role: 'user', content: content }]
-    });
+    let response;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        response = await anthropic.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 100,
+          messages: [{ role: 'user', content: content }]
+        });
+        break;
+      } catch (err) {
+        if ((err.status === 429 || err.status === 529) && attempt < 3) {
+          console.log('retry attempt', attempt, 'waiting', attempt * 3, 'sec');
+          await new Promise(r => setTimeout(r, attempt * 3000));
+        } else {
+          throw err;
+        }
+      }
+    }
     const raw = response.content[0].text.replace(/```json|```/g, '').trim();
     console.log('work image raw:', raw);
 
