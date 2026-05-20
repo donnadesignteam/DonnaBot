@@ -745,6 +745,7 @@ async function getPricingRow(name, subName) {
     .ilike('name', '%' + mainKeyword + '%');
   if (subName) q = q.ilike('sub_name', '%' + subName + '%');
   const { data } = await q.limit(3);
+  console.log('getPricingRow:', name, subName, '->', data?.[0]?.name, data?.[0]?.sub_name);
   return data && data.length > 0 ? data[0] : null;
 }
 
@@ -881,8 +882,7 @@ async function handleDirectChat(replyToken, userId, userText) {
     const [railRow, curtainRow, sheerRow] = await Promise.all([
       isBlind ? null : getPricingRow(railName, null),
       getPricingRow(curtainType, fabric),
-      floors === 2 && !isBlind ? getPricingRow(curtainType, 'โปร่ง') : null,
-    ]);
+      floors === 2 && !isBlind ? getPricingRow(curtainType + 'โปร่ง', null) : null,
 
     const isWaveOrPleat = /ลอนเทป|จีบ|ลอนตะขอ/.test(curtainType);
     const displayW = isWaveOrPleat ? (width / 2) : width;
