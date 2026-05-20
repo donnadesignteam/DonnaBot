@@ -316,7 +316,7 @@ const { data: examples } = await supabase
         break;
       } catch (err) {
         if ((err.status === 429 || err.status === 529) && attempt < 3) {
-          console.log('retry attempt', attempt, 'waiting', attempt * 3, 'sec');
+          console.log('rate limit retry attempt', attempt, 'of 3, waiting', attempt * 3, 'seconds');
           await new Promise(r => setTimeout(r, attempt * 3000));
         } else {
           throw err;
