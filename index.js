@@ -736,6 +736,30 @@ function recommendDimensions({ curtainType, windowType, width, height, canAddBot
   return { railW, curtainW, curtainH, qty };
 }
 
+async function getSheerRow(curtainType) {
+  const typeMap = {
+    'ม่านตาไก่': 'ผ้าโปร่งตาไก่',
+    'ม่านซ่อนหู': 'ผ้าโปร่งซ่อนหู',
+    'ม่านลอนตะขอ': 'ผ้าโปร่งลอนตะขอ',
+    'ม่านคอกระเช้า': 'ผ้าโปร่งคอกระเช้า',
+    'ม่านจีบ': 'ผ้าโปร่งม่านจีบ',
+    'ม่านลอนเทป': 'ผ้าโปร่งลอนเทป',
+    'ม่านสอด': 'ผ้าโปร่งม่านสอด',
+    'ม่านลอนโซ่': 'ผ้าโปร่งลอนโซ่',
+  };
+  const baseName = curtainType.replace(/\s*สูงพิเศษ/gi, '').trim();
+  const sheerName = typeMap[baseName];
+  if (!sheerName) return null;
+  const { data } = await supabase
+    .from('pricing')
+    .select('name, sub_name, price, min_price, unit')
+    .eq('category', 'sheer')
+    .ilike('name', '%' + sheerName + '%')
+    .ilike('sub_name', sheerName)
+    .limit(1);
+  return data && data.length > 0 ? data[0] : null;
+}
+
 // ── ดึงราคาจาก Supabase ──────────────────────────────────
 async function getPricingRow(name, subName) {
   const mainKeyword = name.split(/\s+/)[0];
@@ -882,7 +906,7 @@ async function handleDirectChat(replyToken, userId, userText) {
     const [railRow, curtainRow, sheerRow] = await Promise.all([
       isBlind ? null : getPricingRow(railName, null),
       getPricingRow(curtainType, fabric),
-      floors === 2 && !isBlind ? getPricingRow(curtainType + 'โปร่ง', null) : null,
+      floors === 2 && !isBlind ? getSheerRow(curtainType) : null,
 
     const isWaveOrPleat = /ลอนเทป|จีบ|ลอนตะขอ/.test(curtainType);
     const displayW = isWaveOrPleat ? (width / 2) : width;
