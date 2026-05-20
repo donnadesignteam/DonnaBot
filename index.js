@@ -88,6 +88,13 @@ async function handleEvent(event) {
     return;
   }
 
+  if (!groupId && event.source.type === 'user') {
+    if (message.type === 'text') {
+      await handleDirectChat(replyToken, event.source.userId, message.text.trim());
+    }
+    return;
+  }
+
   // กลุ่มช่าง 4 กลุ่ม — อ่านภาพดูเลขออเดอร์
   if ([GROUP_CUT, GROUP_SEW, GROUP_IRON, GROUP_PACK].includes(groupId)) {
     if (message.type === 'image') {
@@ -692,6 +699,234 @@ async function handleUnsend(event) {
     console.error('handleUnsend error:', err);
   }
 }
+
+// ── คำนวณขนาดม่านพร้อมเผื่อ ─────────────────────────────
+function recommendDimensions({ curtainType, windowType, width, height, canAddBothSides }) {
+  const isPleat   = /จีบ/.test(curtainType);
+  const isWave    = /ลอนเทป/.test(curtainType);
+  const isChain   = /ลอนโซ่/.test(curtainType);
+  const isBlind   = /มู่ลี่|ม่านพับ|ม่านม้วน/.test(curtainType);
+  let railW;
+  if (isBlind) {
+    railW = canAddBothSides ? width + 0.10 : width + 0.05;
+  } else {
+    railW = canAddBothSides ? width + 0.20 : width + 0.10;
+  }
+  railW = Math.round(railW * 100) / 100;
+  let curtainW, qty;
+  if (isPleat || isWave) {
+    curtainW = Math.round((railW / 2) * 100) / 100;
+    qty = 2;
+  } else if (isChain) {
+    curtainW = Math.round((railW * 1.15) * 100) / 100;
+    qty = 2;
+  } else {
+    curtainW = railW;
+    qty = 2;
+  }
+  let curtainH;
+  if (isBlind && /ม่านม้วน|มู่ลี่/.test(curtainType)) {
+    curtainH = height + 0.15;
+  } else if (/ม่านพับ/.test(curtainType)) {
+    curtainH = height + 0.50;
+  } else {
+    curtainH = windowType === 'door' ? height + 0.20 : height + 0.40;
+  }
+  curtainH = Math.round(curtainH * 100) / 100;
+  return { railW, curtainW, curtainH, qty };
+}
+
+// ── ดึงราคาจาก Supabase ──────────────────────────────────
+async function getPricingRow(name, subName) {
+  const mainKeyword = name.split(/\s+/)[0];
+  let q = supabase.from('pricing')
+    .select('name, sub_name, price, min_price, unit')
+    .neq('unit', 'matrix')
+    .ilike('name', '%' + mainKeyword + '%');
+  if (subName) q = q.ilike('sub_name', '%' + subName + '%');
+  const { data } = await q.limit(3);
+  return data && data.length > 0 ? data[0] : null;
+}
+
+// ── หาชื่อราง ────────────────────────────────────────────
+function getRailName(curtainType, floors) {
+  if (/จีบ|ลอนตะขอ/.test(curtainType)) return `รางจีบ${floors}ชั้น`;
+  if (/ลอนโซ่/.test(curtainType)) return `รางลอนโซ่${floors}ชั้น`;
+  if (/ลอนเทป/.test(curtainType)) return `รางsnake${floors}ชั้น`;
+  return `ราง${floors}ชั้น`;
+}
+
+// ── helper ───────────────────────────────────────────────
+async function replyText(replyToken, text) {
+  await client.replyMessage({ replyToken, messages: [{ type: 'text', text }] });
+}
+
+// ── ตอบคำถามออเดอร์ ─────────────────────────────────────
+async function handleOrderQuery(replyToken, userId, userText) {
+  const { data: rows } = await supabase
+    .from('chat_history')
+    .select('role, content')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(4);
+  const messages = (rows || []).reverse().map(r => ({ role: r.role, content: r.content }));
+  messages.push({ role: 'user', content: userText });
+  let currentMessages = [...messages];
+  let finalText = '';
+  let rounds = 0;
+  while (rounds < 5) {
+    rounds++;
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 500,
+      system: 'คุณคือผู้ช่วยร้านผ้าม่าน ตอบภาษาไทยกระชับ ใช้หางเสียง "ค่ะ" ห้าม markdown',
+      tools: ADMIN_TOOLS.filter(t => ['get_orders', 'get_work_status', 'get_supplier_orders', 'update_order'].includes(t.name)),
+      messages: currentMessages,
+    });
+    if (response.stop_reason === 'end_turn') {
+      finalText = response.content.find(b => b.type === 'text')?.text || '';
+      break;
+    }
+    if (response.stop_reason === 'tool_use') {
+      const toolResults = [];
+      for (const block of response.content) {
+        if (block.type !== 'tool_use') continue;
+        const result = await executeTool(block.name, block.input, userId);
+        toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(result) });
+      }
+      currentMessages.push({ role: 'assistant', content: response.content });
+      currentMessages.push({ role: 'user', content: toolResults });
+    } else break;
+  }
+  await supabase.from('chat_history').insert({ user_id: userId, role: 'user', content: userText });
+  await supabase.from('chat_history').insert({ user_id: userId, role: 'assistant', content: finalText });
+  await client.replyMessage({ replyToken, messages: [{ type: 'text', text: finalText }] });
+}
+
+// ── ตอบคำถามทั่วไป ───────────────────────────────────────
+async function handleOtherQuery(replyToken, userId, userText, memoryText) {
+  const { data: rows } = await supabase
+    .from('chat_history')
+    .select('role, content')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(4);
+  const messages = (rows || []).reverse().map(r => ({ role: r.role, content: r.content }));
+  messages.push({ role: 'user', content: userText });
+  const response = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 500,
+    system: 'คุณคือผู้ช่วยร้านผ้าม่าน ตอบภาษาไทยกระชับ ใช้หางเสียง "ค่ะ" ห้าม markdown' + memoryText,
+    messages,
+  });
+  const finalText = response.content[0].text;
+  await supabase.from('chat_history').insert({ user_id: userId, role: 'user', content: userText });
+  await supabase.from('chat_history').insert({ user_id: userId, role: 'assistant', content: finalText });
+  await client.replyMessage({ replyToken, messages: [{ type: 'text', text: finalText }] });
+}
+
+// ── handleDirectChat ──────────────────────────────────────
+async function handleDirectChat(replyToken, userId, userText) {
+  try {
+    const { data: memRows } = await supabase
+      .from('bot_memory')
+      .select('content')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+      .limit(10);
+    const memoryText = (memRows || []).length > 0
+      ? '\n\nสิ่งที่จำ:\n' + memRows.map(m => '- ' + m.content).join('\n')
+      : '';
+    const parseRes = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
+      messages: [{ role: 'user', content:
+        'อ่านข้อความแล้วตอบ JSON เท่านั้น ห้าม markdown\n' +
+        '{"intent":"price|size|order|other","curtain_type":"","fabric":"Dimout|Blackout|โปร่ง|ลินิน","floors":2,"window_type":"window|door","width":null,"height":null,"already_sized":null,"both_sides":null}\n' +
+        'intent: price=ถามราคา size=ถามขนาด order=ถามออเดอร์/สถานะ other=อื่นๆ\n' +
+        'already_sized: true=เผื่อแล้ว false=ยังไม่เผื่อ null=ไม่ได้บอก\n' +
+        'both_sides: true=เผื่อได้สองข้าง false=ข้างเดียว null=ไม่ได้บอก\n' +
+        'ข้อความ: ' + userText
+      }]
+    });
+    const raw = parseRes.content[0].text.replace(/```json|```/g, '').trim();
+    console.log('parsed intent:', raw);
+    const intent = JSON.parse(raw);
+
+    if (intent.intent === 'order') return await handleOrderQuery(replyToken, userId, userText);
+    if (intent.intent === 'other') return await handleOtherQuery(replyToken, userId, userText, memoryText);
+
+    if (!intent.curtain_type) return await replyText(replyToken, 'กรุณาระบุชนิดม่านด้วยค่ะ เช่น ม่านตาไก่ ม่านพับ มู่ลี่อลูมิเนียม');
+    if (!intent.width) return await replyText(replyToken, 'กรุณาระบุขนาดกว้างด้วยค่ะ');
+    if (!intent.height) return await replyText(replyToken, 'กรุณาระบุขนาดสูงด้วยค่ะ');
+
+    let { width, height } = intent;
+    const curtainType = intent.curtain_type;
+    const fabric = intent.fabric || 'Dimout';
+    const floors = intent.floors || 2;
+    const windowType = intent.window_type || 'window';
+
+    if (intent.already_sized === false || intent.already_sized === null) {
+      if (intent.both_sides === null) return await replyText(replyToken, 'เผื่อได้สองข้างหรือข้างเดียวคะ');
+      const dims = recommendDimensions({
+        curtainType, windowType, width, height,
+        canAddBothSides: intent.both_sides !== false
+      });
+      width = dims.railW;
+      height = dims.curtainH;
+    }
+
+    const isBlind = /มู่ลี่|ม่านพับ|ม่านม้วน/.test(curtainType);
+    const railName = getRailName(curtainType, floors);
+    const [railRow, curtainRow, sheerRow] = await Promise.all([
+      isBlind ? null : getPricingRow(railName, null),
+      getPricingRow(curtainType, fabric),
+      floors === 2 && !isBlind ? getPricingRow(curtainType, 'โปร่ง') : null,
+    ]);
+
+    const isWaveOrPleat = /ลอนเทป|จีบ|ลอนตะขอ/.test(curtainType);
+    const displayW = isWaveOrPleat ? (width / 2) : width;
+
+    let reply = 'แนะนำใช้ขนาดนี้ได้ค่ะ\n';
+    let total = 0;
+
+    if (railRow) {
+      const railPrice = Math.round(Math.max(railRow.price * width, railRow.min_price || 0));
+      reply += `${railName} ${width.toFixed(2)} = 1 ชุด ${railPrice.toLocaleString()} บาท\n`;
+      total += railPrice;
+    }
+    if (curtainRow) {
+      let curtainPrice;
+      if (/ม่านพับ/.test(curtainType)) {
+        curtainPrice = Math.round(Math.max(curtainRow.price * width, curtainRow.min_price || 0));
+        reply += `ม่านพับ ${fabric}\n${width.toFixed(2)} = 1 ชุด ${curtainPrice.toLocaleString()} บาท\n`;
+      } else if (/ม่านม้วน/.test(curtainType)) {
+        const area = Math.max(width * height * 1.2, 1.5);
+        curtainPrice = Math.round(Math.max(curtainRow.price * area, curtainRow.min_price || 0));
+        reply += `ม่านม้วน ${fabric}\n${width.toFixed(2)}*${height.toFixed(2)} = 1 ชุด ${curtainPrice.toLocaleString()} บาท\n`;
+      } else {
+        curtainPrice = Math.round(Math.max(curtainRow.price * width, curtainRow.min_price || 0)) * (isBlind ? 1 : 2);
+        const qty = isBlind ? '1 ชุด' : '2 ผืน';
+        reply += `${curtainType} ${fabric}\n${displayW.toFixed(2)}*${height.toFixed(2)} = ${qty} ${curtainPrice.toLocaleString()} บาท\n`;
+      }
+      total += curtainPrice;
+    }
+    if (sheerRow) {
+      const sheerPrice = Math.round(Math.max(sheerRow.price * width, sheerRow.min_price || 0)) * 2;
+      reply += `ผ้าโปร่ง\n${displayW.toFixed(2)}*${height.toFixed(2)} = 2 ผืน ${sheerPrice.toLocaleString()} บาท\n`;
+      total += sheerPrice;
+    }
+
+    reply += `รวม ${total.toLocaleString()} บาทค่ะ`;
+    await client.replyMessage({ replyToken, messages: [{ type: 'text', text: reply }] });
+
+  } catch (err) {
+    console.error('handleDirectChat error:', err);
+    await client.replyMessage({ replyToken, messages: [{ type: 'text', text: 'ขออภัยค่ะ เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ' }] });
+  }
+}
+
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log('Server running on port ' + PORT + ' v2.2'));
