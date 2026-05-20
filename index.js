@@ -954,4 +954,4 @@ async function handleDirectChat(replyToken, userId, userText) {
 
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Server running on port ' + PORT + ' v2.2'));
+app.listen(PORT, () => console.log('Server running on port ' + PORT + ' v2.3'));
