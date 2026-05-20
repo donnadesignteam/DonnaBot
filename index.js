@@ -907,6 +907,7 @@ async function handleDirectChat(replyToken, userId, userText) {
       isBlind ? null : getPricingRow(railName, null),
       getPricingRow(curtainType, fabric),
       floors === 2 && !isBlind ? getSheerRow(curtainType) : null,
+    ]);
 
     const isWaveOrPleat = /ลอนเทป|จีบ|ลอนตะขอ/.test(curtainType);
     const displayW = isWaveOrPleat ? (width / 2) : width;
