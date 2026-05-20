@@ -694,4 +694,4 @@ async function handleUnsend(event) {
 }
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Server running on port ' + PORT + ' v2.1'));
+app.listen(PORT, () => console.log('Server running on port ' + PORT + ' v2.2'));
