@@ -904,8 +904,16 @@ async function handleDirectChat(replyToken, userId, userText) {
       return await replyText(replyToken, 'กรุณาระบุขนาดกว้างด้วยค่ะ');
     }
     if (!intent.height) return await replyText(replyToken, 'กรุณาระบุขนาดสูงด้วยค่ะ');
-    if (!intent.floors) return await replyText(replyToken, 'ต้องการกี่ชั้นคะ เช่น 1 ชั้น หรือ 2 ชั้น (ทึบ+โปร่ง)');
-    if (intent.already_sized === null) return await replyText(replyToken, 'ขนาดที่ให้มาเผื่อแล้วหรือยังคะ');
+    if (!intent.floors) {
+      await supabase.from('chat_history').insert({ user_id: userId, role: 'user', content: userText });
+      await supabase.from('chat_history').insert({ user_id: userId, role: 'assistant', content: 'ต้องการกี่ชั้นคะ เช่น 1 ชั้น หรือ 2 ชั้น (ทึบ+โปร่ง)' });
+      return await replyText(replyToken, 'ต้องการกี่ชั้นคะ เช่น 1 ชั้น หรือ 2 ชั้น (ทึบ+โปร่ง)');
+    }
+    if (intent.already_sized === null) {
+      await supabase.from('chat_history').insert({ user_id: userId, role: 'user', content: userText });
+      await supabase.from('chat_history').insert({ user_id: userId, role: 'assistant', content: 'ขนาดที่ให้มาเผื่อแล้วหรือยังคะ' });
+      return await replyText(replyToken, 'ขนาดที่ให้มาเผื่อแล้วหรือยังคะ');
+    }
 
   let { width, height } = intent;
     const curtainType = intent.curtain_type;
