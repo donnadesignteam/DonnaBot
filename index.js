@@ -911,7 +911,7 @@ async function handleDirectChat(replyToken, userId, userText) {
 
    // เช็คข้อมูลที่ขาด แล้วถามทีเดียว
     const missing = [];
-    if (!intent.curtain_type) missing.push('ชนิดม่าน เช่น ม่านตาไก่ ม่านจีบ ม่านลอนเทป');
+    if (!intent.fabric) missing.push('ชนิดผ้า เช่น Dimout (กึ่งทึบ) หรือ Blackout (ทึบสนิท)');
     if (!intent.width) missing.push('ขนาดกว้าง (เมตร)');
     if (!intent.height) missing.push('ขนาดสูง (เมตร)');
     if (!intent.floors) missing.push('จำนวนชั้น เช่น 1 ชั้น หรือ 2 ชั้น (ทึบ+โปร่ง)');
