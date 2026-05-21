@@ -873,8 +873,9 @@ async function handleDirectChat(replyToken, userId, userText) {
       max_tokens: 300,
       messages: [{ role: 'user', content:
         'อ่านข้อความแล้วตอบ JSON เท่านั้น ห้าม markdown\n' +
-        '{"intent":"price|size|order|other","curtain_type":"","fabric":"Dimout|Blackout|โปร่ง|ลินิน","floors":2,"window_type":"window|door","width":null,"height":null,"already_sized":null,"both_sides":null}\n' +
+        '{"intent":"price|size|order|other","curtain_type":"","fabric":"Dimout|Blackout|โปร่ง|ลินิน","floors":null,"window_type":"window|door","width":null,"height":null,"already_sized":null,"both_sides":null}\n' +
         'intent: price=ถามราคา size=ถามขนาด order=ถามออเดอร์/สถานะ other=อื่นๆ\n' +
+        'floors: จำนวนชั้น ถ้าไม่ได้บอกให้ใส่ null\n' +
         'already_sized: true=เผื่อแล้ว false=ยังไม่เผื่อ null=ไม่ได้บอก\n' +
         'both_sides: true=เผื่อได้สองข้าง false=ข้างเดียว null=ไม่ได้บอก\n' +
         'ข้อความ: ' + userText
@@ -894,6 +895,8 @@ async function handleDirectChat(replyToken, userId, userText) {
       return await replyText(replyToken, 'กรุณาระบุขนาดกว้างด้วยค่ะ');
     }
     if (!intent.height) return await replyText(replyToken, 'กรุณาระบุขนาดสูงด้วยค่ะ');
+    if (!intent.floors) return await replyText(replyToken, 'ต้องการกี่ชั้นคะ เช่น 1 ชั้น หรือ 2 ชั้น (ทึบ+โปร่ง)');
+    if (intent.already_sized === null) return await replyText(replyToken, 'ขนาดที่ให้มาเผื่อแล้วหรือยังคะ');
 
   let { width, height } = intent;
     const curtainType = intent.curtain_type;
