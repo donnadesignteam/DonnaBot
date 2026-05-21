@@ -891,9 +891,9 @@ async function handleDirectChat(replyToken, userId, userText) {
     }
     if (!intent.height) return await replyText(replyToken, 'กรุณาระบุขนาดสูงด้วยค่ะ');
 
-    let { width, height } = intent;
+  let { width, height } = intent;
     const curtainType = intent.curtain_type;
-    const fabric = intent.fabric || 'Dimout';
+    let fabric = intent.fabric || 'Dimout';
     const floors = intent.floors || 2;
     const windowType = intent.window_type || 'window';
 
@@ -905,6 +905,13 @@ async function handleDirectChat(replyToken, userId, userText) {
       });
       width = dims.railW;
       height = dims.curtainH;
+    }
+
+    // เช็คสูงพิเศษหลังได้ height จริงแล้ว
+    const isWaveCurtain = /ลอนเทป/.test(curtainType);
+    const heightLimit = isWaveCurtain ? 2.70 : 2.63;
+    if (height > heightLimit && !fabric.includes('สูงพิเศษ')) {
+      fabric = fabric + ' สูงพิเศษ';
     }
 
     const isBlind = /มู่ลี่|ม่านพับ|ม่านม้วน/.test(curtainType);
