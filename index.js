@@ -897,22 +897,21 @@ async function handleDirectChat(replyToken, userId, userText) {
     if (intent.intent === 'order') return await handleOrderQuery(replyToken, userId, userText);
     if (intent.intent === 'other') return await handleOtherQuery(replyToken, userId, userText, memoryText);
 
-   if (!intent.curtain_type) return await replyText(replyToken, 'กรุณาระบุชนิดม่านด้วยค่ะ เช่น ม่านตาไก่ ม่านพับ มู่ลี่อลูมิเนียม');
-    if (!intent.width) {
-      const row = await getPricingRow(intent.curtain_type, null);
-      if (row) return await replyText(replyToken, `${row.name} ราคา ${row.price.toLocaleString()} บาท/เมตรค่ะ`);
-      return await replyText(replyToken, 'กรุณาระบุขนาดกว้างด้วยค่ะ');
-    }
-    if (!intent.height) return await replyText(replyToken, 'กรุณาระบุขนาดสูงด้วยค่ะ');
-    if (!intent.floors) {
+   // เช็คข้อมูลที่ขาด แล้วถามทีเดียว
+    const missing = [];
+    if (!intent.curtain_type) missing.push('ชนิดม่าน เช่น ม่านตาไก่ ม่านจีบ ม่านลอนเทป');
+    if (!intent.width) missing.push('ขนาดกว้าง (เมตร)');
+    if (!intent.height) missing.push('ขนาดสูง (เมตร)');
+    if (!intent.floors) missing.push('จำนวนชั้น เช่น 1 ชั้น หรือ 2 ชั้น (ทึบ+โปร่ง)');
+    if (intent.already_sized === null) missing.push('ขนาดเผื่อแล้วหรือยัง');
+    if (intent.already_sized === false && intent.both_sides === null) missing.push('เผื่อได้สองข้างหรือข้างเดียว');
+    if (!intent.window_type) missing.push('เป็นหน้าต่างหรือประตู');
+
+    if (missing.length > 0) {
+      const msg = 'ขอข้อมูลเพิ่มเติมด้วยนะคะ\n' + missing.map((m, i) => `${i + 1}. ${m}`).join('\n');
       await supabase.from('chat_history').insert({ user_id: userId, role: 'user', content: userText });
-      await supabase.from('chat_history').insert({ user_id: userId, role: 'assistant', content: 'ต้องการกี่ชั้นคะ เช่น 1 ชั้น หรือ 2 ชั้น (ทึบ+โปร่ง)' });
-      return await replyText(replyToken, 'ต้องการกี่ชั้นคะ เช่น 1 ชั้น หรือ 2 ชั้น (ทึบ+โปร่ง)');
-    }
-    if (intent.already_sized === null) {
-      await supabase.from('chat_history').insert({ user_id: userId, role: 'user', content: userText });
-      await supabase.from('chat_history').insert({ user_id: userId, role: 'assistant', content: 'ขนาดที่ให้มาเผื่อแล้วหรือยังคะ' });
-      return await replyText(replyToken, 'ขนาดที่ให้มาเผื่อแล้วหรือยังคะ');
+      await supabase.from('chat_history').insert({ user_id: userId, role: 'assistant', content: msg });
+      return await replyText(replyToken, msg);
     }
 
   let { width, height } = intent;
