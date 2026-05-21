@@ -477,7 +477,7 @@ async function handleFeedbackCorrect(replyToken, groupId, correctNum = null) {
 const cron = require('node-cron');
 
 console.log('cron registered');
-cron.schedule('00 19 * * *', async () => {
+cron.schedule('15 19 * * *', async () => {
   console.log('cron fired');
   try {
     const now = new Date();
@@ -486,11 +486,12 @@ const bangkokTime = new Date(now.getTime() + bangkokOffset * 60 * 1000);
 const todayStr = bangkokTime.toISOString().split('T')[0];
 const today = bangkokTime.getDate() + '/' + (bangkokTime.getMonth() + 1) + '/' + bangkokTime.getFullYear();
 
-const { data: orders } = await supabase
+const { data: orders, error: ordersError } = await supabase
   .from('work_status')
   .select('order_number, status')
   .in('status', ['กำลังตัด', 'กำลังเย็บ', 'กำลังรีด', 'กำลังแพ็ค'])
   .gte('status_updated_at', todayStr);
+console.log('cron orders:', orders?.length, 'error:', ordersError?.message, 'todayStr:', todayStr);
 
     const cut = orders.filter(o => o.status === 'กำลังตัด').map(o => o.order_number).join('\n') || '-';
     const sew = orders.filter(o => o.status === 'กำลังเย็บ').map(o => o.order_number).join('\n') || '-';
