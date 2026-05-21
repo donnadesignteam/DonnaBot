@@ -939,7 +939,8 @@ async function handleDirectChat(replyToken, userId, userText) {
       total += curtainPrice;
     }
     if (sheerRow) {
-      const sheerPrice = Math.round(Math.max(sheerRow.price * width, sheerRow.min_price || 0)) * 2;
+      const isWaveOrPleatSheer = /ลอนเทป|จีบ|ลอนตะขอ/.test(curtainType);
+      const sheerPrice = Math.round(Math.max(sheerRow.price * width, sheerRow.min_price || 0)) * (isWaveOrPleatSheer ? 1 : 2);
       reply += `ผ้าโปร่ง\n${displayW.toFixed(2)}*${height.toFixed(2)} = 2 ผืน ${sheerPrice.toLocaleString()} บาท\n`;
       total += sheerPrice;
     }
