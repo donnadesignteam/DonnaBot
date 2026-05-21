@@ -868,6 +868,14 @@ async function handleDirectChat(replyToken, userId, userText) {
     const memoryText = (memRows || []).length > 0
       ? '\n\nสิ่งที่จำ:\n' + memRows.map(m => '- ' + m.content).join('\n')
       : '';
+    const { data: histRows } = await supabase
+      .from('chat_history')
+      .select('role, content')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(4);
+    const recentHistory = (histRows || []).reverse().map(r => r.role + ': ' + r.content).join('\n');
+
     const parseRes = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 300,
@@ -878,7 +886,8 @@ async function handleDirectChat(replyToken, userId, userText) {
         'floors: จำนวนชั้น ถ้าไม่ได้บอกให้ใส่ null\n' +
         'already_sized: true=เผื่อแล้ว false=ยังไม่เผื่อ null=ไม่ได้บอก\n' +
         'both_sides: true=เผื่อได้สองข้าง false=ข้างเดียว null=ไม่ได้บอก\n' +
-        'ข้อความ: ' + userText
+        (recentHistory ? 'ประวัติการสนทนา:\n' + recentHistory + '\n\n' : '') +
+        'ข้อความล่าสุด: ' + userText
       }]
     });
     const raw = parseRes.content[0].text.replace(/```json|```/g, '').trim();
