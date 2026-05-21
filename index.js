@@ -736,7 +736,7 @@ function recommendDimensions({ curtainType, windowType, width, height, canAddBot
   return { railW, curtainW, curtainH, qty };
 }
 
-async function getSheerRow(curtainType) {
+async function getSheerRow(curtainType, fabric = '') {
   const typeMap = {
     'ม่านตาไก่': 'ผ้าโปร่งตาไก่',
     'ม่านซ่อนหู': 'ผ้าโปร่งซ่อนหู',
@@ -751,13 +751,17 @@ async function getSheerRow(curtainType) {
   const normalizedName = baseName.startsWith('ม่าน') ? baseName : 'ม่าน' + baseName;
   const sheerName = typeMap[normalizedName];
   if (!sheerName) return null;
-  const { data, error } = await supabase
-    .from('pricing')
+  const isHighSheer = fabric.includes('สูงพิเศษ');
+  let q = supabase.from('pricing')
     .select('name, sub_name, price, min_price, unit')
     .eq('category', 'sheer')
-    .ilike('name', '%' + sheerName + '%')
-    .ilike('sub_name', sheerName)
-    .limit(1);
+    .ilike('name', '%' + sheerName + '%');
+  if (isHighSheer) {
+    q = q.ilike('sub_name', '%สูงพิเศษ%');
+  } else {
+    q = q.not('sub_name', 'ilike', '%สูงพิเศษ%').not('sub_name', 'ilike', '%หนาพิเศษ%');
+  }
+  const { data, error } = await q.limit(1);
   console.log('getSheerRow:', curtainType, '-> sheerName:', sheerName, 'rows:', data?.length, 'first:', data?.[0]?.name, data?.[0]?.price, 'error:', error?.message);
   return data && data.length > 0 ? data[0] : null;
 }
@@ -920,7 +924,7 @@ async function handleDirectChat(replyToken, userId, userText) {
     const [railRow, curtainRow, sheerRow] = await Promise.all([
       isBlind ? null : getPricingRow(railName, null),
       getPricingRow(curtainType, fabric),
-      floors === 2 && !isBlind ? getSheerRow(curtainType) : null,
+      floors === 2 && !isBlind ? getSheerRow(curtainType, fabric) : null,
     ]);
 
     const isWaveOrPleat = /ลอนเทป|จีบ|ลอนตะขอ/.test(curtainType);
