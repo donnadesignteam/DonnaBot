@@ -917,11 +917,12 @@ async function handleDirectChat(replyToken, userId, userText) {
     if (!intent.window_type) missing.push('เป็นหน้าต่างหรือประตู');
 
     if (missing.length > 0) {
-      await supabase.from('pending_intent').upsert({
+      const { error: upsertError } = await supabase.from('pending_intent').upsert({
         user_id: userId,
         intent: intent,
         updated_at: new Date().toISOString()
       });
+      console.log('upsert pending_intent error:', upsertError?.message);
       const msg = 'ขอข้อมูลเพิ่มเติมด้วยนะคะ\n' + missing.map((m, i) => `${i + 1}. ${m}`).join('\n');
       await supabase.from('chat_history').insert({ user_id: userId, role: 'user', content: userText });
       await supabase.from('chat_history').insert({ user_id: userId, role: 'assistant', content: msg });
