@@ -750,13 +750,14 @@ async function getSheerRow(curtainType) {
   const baseName = curtainType.replace(/\s*สูงพิเศษ/gi, '').trim();
   const sheerName = typeMap[baseName];
   if (!sheerName) return null;
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('pricing')
     .select('name, sub_name, price, min_price, unit')
     .eq('category', 'sheer')
     .ilike('name', '%' + sheerName + '%')
     .ilike('sub_name', sheerName)
     .limit(1);
+  console.log('getSheerRow:', curtainType, '-> sheerName:', sheerName, 'rows:', data?.length, 'first:', data?.[0]?.name, data?.[0]?.price, 'error:', error?.message);
   return data && data.length > 0 ? data[0] : null;
 }
 
