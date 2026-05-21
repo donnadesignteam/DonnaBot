@@ -883,8 +883,12 @@ async function handleDirectChat(replyToken, userId, userText) {
     if (intent.intent === 'order') return await handleOrderQuery(replyToken, userId, userText);
     if (intent.intent === 'other') return await handleOtherQuery(replyToken, userId, userText, memoryText);
 
-    if (!intent.curtain_type) return await replyText(replyToken, 'กรุณาระบุชนิดม่านด้วยค่ะ เช่น ม่านตาไก่ ม่านพับ มู่ลี่อลูมิเนียม');
-    if (!intent.width) return await replyText(replyToken, 'กรุณาระบุขนาดกว้างด้วยค่ะ');
+   if (!intent.curtain_type) return await replyText(replyToken, 'กรุณาระบุชนิดม่านด้วยค่ะ เช่น ม่านตาไก่ ม่านพับ มู่ลี่อลูมิเนียม');
+    if (!intent.width) {
+      const row = await getPricingRow(intent.curtain_type, null);
+      if (row) return await replyText(replyToken, `${row.name} ราคา ${row.price.toLocaleString()} บาท/เมตรค่ะ`);
+      return await replyText(replyToken, 'กรุณาระบุขนาดกว้างด้วยค่ะ');
+    }
     if (!intent.height) return await replyText(replyToken, 'กรุณาระบุขนาดสูงด้วยค่ะ');
 
     let { width, height } = intent;
