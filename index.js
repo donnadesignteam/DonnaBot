@@ -748,7 +748,8 @@ async function getSheerRow(curtainType) {
     'ม่านลอนโซ่': 'ผ้าโปร่งลอนโซ่',
   };
   const baseName = curtainType.replace(/\s*สูงพิเศษ/gi, '').trim();
-  const sheerName = typeMap[baseName];
+  const normalizedName = baseName.startsWith('ม่าน') ? baseName : 'ม่าน' + baseName;
+  const sheerName = typeMap[normalizedName];
   if (!sheerName) return null;
   const { data, error } = await supabase
     .from('pricing')
@@ -903,6 +904,7 @@ async function handleDirectChat(replyToken, userId, userText) {
     }
 
     const isBlind = /มู่ลี่|ม่านพับ|ม่านม้วน/.test(curtainType);
+    console.log('curtainType:', curtainType, 'isBlind:', isBlind, 'floors:', floors);
     const railName = getRailName(curtainType, floors);
     const [railRow, curtainRow, sheerRow] = await Promise.all([
       isBlind ? null : getPricingRow(railName, null),
