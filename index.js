@@ -958,7 +958,8 @@ async function handleDirectChat(replyToken, userId, userText) {
     if (sheerRow) {
       const isWaveOrPleatSheer = /ลอนเทป|จีบ|ลอนตะขอ/.test(curtainType);
       const sheerPrice = Math.round(Math.max(sheerRow.price * width, sheerRow.min_price || 0)) * (isWaveOrPleatSheer ? 1 : 2);
-      reply += `ผ้าโปร่ง\n${displayW.toFixed(2)}*${height.toFixed(2)} = 2 ผืน ${sheerPrice.toLocaleString()} บาท\n`;
+      const sheerLabel = fabric.includes('สูงพิเศษ') ? 'ผ้าโปร่ง สูงพิเศษ' : 'ผ้าโปร่ง';
+      reply += `${sheerLabel}\n${displayW.toFixed(2)}*${height.toFixed(2)} = 2 ผืน ${sheerPrice.toLocaleString()} บาท\n`;
       total += sheerPrice;
     }
 
