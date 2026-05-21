@@ -891,7 +891,8 @@ async function handleDirectChat(replyToken, userId, userText) {
         '{"intent":"price|size|order|other","curtain_type":"","fabric":"Dimout|Blackout|โปร่ง|ลินิน","floors":null,"window_type":"window|door","width":null,"height":null,"already_sized":null,"both_sides":null}\n' +
         'intent: price=ถามราคา size=ถามขนาด order=ถามออเดอร์/สถานะ other=อื่นๆ\n' +
         'floors: จำนวนชั้น ถ้าไม่ได้บอกให้ใส่ null\n' +
-        'already_sized: ต้องมีคำว่าเผื่อแล้ว/วัดแล้ว/ได้ขนาดแล้วถึงใส่ true ถ้าไม่มีให้ใส่ null เสมอ\n' +
+        'already_sized: ถ้าไม่มีคำพูดเรื่องการเผื่อขนาดเลยให้ใส่ null เสมอ ห้ามเดาเด็ดขาด\n' +
+        'both_sides: ถ้าไม่มีคำพูดเรื่องสองข้าง/ข้างเดียวเลยให้ใส่ null เสมอ ห้ามเดาเด็ดขาด\n' +
         'both_sides: ต้องมีคำว่าสองข้าง/ข้างเดียวถึงกำหนดค่า ถ้าไม่มีให้ใส่ null เสมอ\n' +
         'window_type: ต้องมีคำว่าประตู/หน้าต่างถึงกำหนดค่า ถ้าไม่มีให้ใส่ null เสมอ\n' +
         'floors: ต้องมีตัวเลขหรือคำว่ากี่ชั้นถึงกำหนดค่า ถ้าไม่มีให้ใส่ null เสมอ\n' +
@@ -915,8 +916,8 @@ async function handleDirectChat(replyToken, userId, userText) {
     if (!intent.height) missing.push('ขนาดสูง (เมตร)');
     if (!intent.floors) missing.push('จำนวนชั้น เช่น 1 ชั้น หรือ 2 ชั้น (ทึบ+โปร่ง)');
     if (intent.already_sized === null) missing.push('ขนาดเผื่อแล้วหรือยัง');
+    if (intent.already_sized === null) missing.push('ขนาดเผื่อแล้วหรือยัง (ตอบว่า "เผื่อแล้ว" หรือ "ยังไม่เผื่อ")');
     if (intent.already_sized === false && intent.both_sides === null) missing.push('เผื่อได้สองข้างหรือข้างเดียว');
-    if (!intent.window_type) missing.push('เป็นหน้าต่างหรือประตู');
 
     if (missing.length > 0) {
       const { error: upsertError } = await supabase.from('pending_intent').upsert({
