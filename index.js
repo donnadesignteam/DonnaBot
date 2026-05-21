@@ -931,7 +931,8 @@ async function handleDirectChat(replyToken, userId, userText) {
         curtainPrice = Math.round(Math.max(curtainRow.price * area, curtainRow.min_price || 0));
         reply += `ม่านม้วน ${fabric}\n${width.toFixed(2)}*${height.toFixed(2)} = 1 ชุด ${curtainPrice.toLocaleString()} บาท\n`;
       } else {
-        curtainPrice = Math.round(Math.max(curtainRow.price * width, curtainRow.min_price || 0)) * (isBlind ? 1 : 2);
+        const isWaveOrPleatPrice = /ลอนเทป|จีบ|ลอนตะขอ/.test(curtainType);
+        curtainPrice = Math.round(Math.max(curtainRow.price * width, curtainRow.min_price || 0)) * (isBlind || isWaveOrPleatPrice ? 1 : 2);
         const qty = isBlind ? '1 ชุด' : '2 ผืน';
         reply += `${curtainType} ${fabric}\n${displayW.toFixed(2)}*${height.toFixed(2)} = ${qty} ${curtainPrice.toLocaleString()} บาท\n`;
       }
