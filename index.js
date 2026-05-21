@@ -869,12 +869,13 @@ async function handleDirectChat(replyToken, userId, userText) {
     const memoryText = (memRows || []).length > 0
       ? '\n\nสิ่งที่จำ:\n' + memRows.map(m => '- ' + m.content).join('\n')
       : '';
-      const { data: pendingRow } = await supabase
+      const { data: pendingRow, error: pendingError } = await supabase
       .from('pending_intent')
       .select('intent')
       .eq('user_id', userId)
       .maybeSingle();
     const pendingIntent = pendingRow?.intent || {};
+    console.log('pendingIntent:', JSON.stringify(pendingIntent), 'error:', pendingError?.message);
     const { data: histRows } = await supabase
       .from('chat_history')
       .select('role, content')
