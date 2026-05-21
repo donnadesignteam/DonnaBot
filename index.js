@@ -891,8 +891,10 @@ async function handleDirectChat(replyToken, userId, userText) {
         '{"intent":"price|size|order|other","curtain_type":"","fabric":"Dimout|Blackout|โปร่ง|ลินิน","floors":null,"window_type":"window|door","width":null,"height":null,"already_sized":null,"both_sides":null}\n' +
         'intent: price=ถามราคา size=ถามขนาด order=ถามออเดอร์/สถานะ other=อื่นๆ\n' +
         'floors: จำนวนชั้น ถ้าไม่ได้บอกให้ใส่ null\n' +
-        'already_sized: true=บอกว่าเผื่อแล้ว false=บอกว่ายังไม่เผื่อ null=ไม่ได้พูดถึงเรื่องนี้เลยให้ใส่ null เสมอ\n' +
-        'both_sides: true=เผื่อได้สองข้าง false=ข้างเดียว null=ไม่ได้บอก\n' +
+        'already_sized: ต้องมีคำว่าเผื่อแล้ว/วัดแล้ว/ได้ขนาดแล้วถึงใส่ true ถ้าไม่มีให้ใส่ null เสมอ\n' +
+        'both_sides: ต้องมีคำว่าสองข้าง/ข้างเดียวถึงกำหนดค่า ถ้าไม่มีให้ใส่ null เสมอ\n' +
+        'window_type: ต้องมีคำว่าประตู/หน้าต่างถึงกำหนดค่า ถ้าไม่มีให้ใส่ null เสมอ\n' +
+        'floors: ต้องมีตัวเลขหรือคำว่ากี่ชั้นถึงกำหนดค่า ถ้าไม่มีให้ใส่ null เสมอ\n' +
         (recentHistory ? 'ประวัติการสนทนา (ใช้รวมกับข้อความล่าสุดเพื่อเติมข้อมูลที่ขาด):\n' + recentHistory + '\n\n' : '') +
         'ข้อความล่าสุด: ' + userText + '\n\n' +
         (Object.keys(pendingIntent).length > 0 ? 'ข้อมูลที่สะสมไว้แล้ว (ห้ามใส่ null ถ้ามีค่าอยู่แล้ว): ' + JSON.stringify(pendingIntent) + '\n' : '') +
