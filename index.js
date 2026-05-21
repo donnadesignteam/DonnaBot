@@ -477,7 +477,7 @@ async function handleFeedbackCorrect(replyToken, groupId, correctNum = null) {
 const cron = require('node-cron');
 
 console.log('cron registered');
-cron.schedule('15 19 * * *', async () => {
+cron.schedule('00 19 * * *', async () => {
   console.log('cron fired');
   try {
     const now = new Date();
@@ -869,6 +869,12 @@ async function handleDirectChat(replyToken, userId, userText) {
     const memoryText = (memRows || []).length > 0
       ? '\n\nสิ่งที่จำ:\n' + memRows.map(m => '- ' + m.content).join('\n')
       : '';
+      const { data: pendingRow } = await supabase
+      .from('pending_intent')
+      .select('intent')
+      .eq('user_id', userId)
+      .maybeSingle();
+    const pendingIntent = pendingRow?.intent || {};
     const { data: histRows } = await supabase
       .from('chat_history')
       .select('role, content')
@@ -888,7 +894,8 @@ async function handleDirectChat(replyToken, userId, userText) {
         'both_sides: true=เผื่อได้สองข้าง false=ข้างเดียว null=ไม่ได้บอก\n' +
         (recentHistory ? 'ประวัติการสนทนา (ใช้รวมกับข้อความล่าสุดเพื่อเติมข้อมูลที่ขาด):\n' + recentHistory + '\n\n' : '') +
         'ข้อความล่าสุด: ' + userText + '\n\n' +
-        'หมายเหตุ: ถ้าในประวัติมีข้อมูลเกี่ยวกับม่านแล้ว ให้นำมารวมกันด้วย เช่น ถ้าเคยบอกชนิดม่านไปแล้วไม่ต้องใส่ null'
+        (Object.keys(pendingIntent).length > 0 ? 'ข้อมูลที่สะสมไว้แล้ว (ห้ามใส่ null ถ้ามีค่าอยู่แล้ว): ' + JSON.stringify(pendingIntent) + '\n' : '') +
+        'หมายเหตุ: นำข้อมูลที่สะสมไว้มารวมกับข้อความล่าสุด อย่า override ค่าที่มีอยู่แล้วด้วย null'
       }]
     });
     const raw = parseRes.content[0].text.replace(/```json|```/g, '').trim();
@@ -909,11 +916,19 @@ async function handleDirectChat(replyToken, userId, userText) {
     if (!intent.window_type) missing.push('เป็นหน้าต่างหรือประตู');
 
     if (missing.length > 0) {
+      await supabase.from('pending_intent').upsert({
+        user_id: userId,
+        intent: intent,
+        updated_at: new Date().toISOString()
+      });
       const msg = 'ขอข้อมูลเพิ่มเติมด้วยนะคะ\n' + missing.map((m, i) => `${i + 1}. ${m}`).join('\n');
       await supabase.from('chat_history').insert({ user_id: userId, role: 'user', content: userText });
       await supabase.from('chat_history').insert({ user_id: userId, role: 'assistant', content: msg });
       return await replyText(replyToken, msg);
     }
+
+    // ข้อมูลครบแล้ว ลบ pending intent
+    await supabase.from('pending_intent').delete().eq('user_id', userId);
 
   let { width, height } = intent;
     const curtainType = intent.curtain_type;
