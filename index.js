@@ -883,10 +883,13 @@ async function handleDirectChat(replyToken, userId, userText) {
       .order('created_at', { ascending: false })
       .limit(8);
     const recentHistory = (histRows || []).reverse().map(r => r.role + ': ' + r.content).join('\n');
-    const parseRes = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 300,
-      messages: [{ role: 'user', content:
+    let parseRes;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        parseRes = await anthropic.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 300,
+          messages: [{ role: 'user', content:
         'อ่านข้อความแล้วตอบ JSON เท่านั้น ห้าม markdown\n' +
         '{"intent":"price|size|order|other","curtain_type":"","fabric":"Dimout|Blackout|โปร่ง|ลินิน","floors":null,"window_type":"window|door","width":null,"height":null,"already_sized":null,"both_sides":null}\n' +
         'intent: price=ถามราคา size=ถามขนาด order=ถามออเดอร์/สถานะ other=อื่นๆ\n' +
@@ -901,7 +904,15 @@ async function handleDirectChat(replyToken, userId, userText) {
         (Object.keys(pendingIntent).length > 0 ? 'ข้อมูลที่สะสมไว้แล้ว (ห้ามใส่ null ถ้ามีค่าอยู่แล้ว): ' + JSON.stringify(pendingIntent) + '\n' : '') +
         'หมายเหตุ: นำข้อมูลที่สะสมไว้มารวมกับข้อความล่าสุด อย่า override ค่าที่มีอยู่แล้วด้วย null'
       }]
-    });
+            });
+            break;
+          } catch (err) {
+            if ((err.status === 429 || err.status === 529) && attempt < 3) {
+              console.log('retry attempt', attempt, 'waiting', attempt * 3, 'seconds');
+              await new Promise(r => setTimeout(r, attempt * 3000));
+            } else throw err;
+          }
+        }
     const raw = parseRes.content[0].text.replace(/```json|```/g, '').trim();
     console.log('parsed intent:', raw);
     const intent = JSON.parse(raw);
@@ -911,6 +922,7 @@ async function handleDirectChat(replyToken, userId, userText) {
 
    // เช็คข้อมูลที่ขาด แล้วถามทีเดียว
     const missing = [];
+    if (!intent.curtain_type) missing.push('ชนิดม่าน เช่น ม่านตาไก่ ม่านจีบ ม่านลอนเทป');
     if (!intent.fabric) missing.push('ชนิดผ้า เช่น Dimout (กึ่งทึบ) หรือ Blackout (ทึบสนิท)');
     if (!intent.width) missing.push('ขนาดกว้าง (เมตร)');
     if (!intent.height) missing.push('ขนาดสูง (เมตร)');
