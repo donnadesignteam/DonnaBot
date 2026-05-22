@@ -949,9 +949,9 @@ async function handleDirectChat(replyToken, userId, userText) {
     }
 
     // อัพเดท pending intent ด้วยข้อมูลล่าสุด เผื่อถามต่อ
-    await supabase.from('pending_intent').upsert({
+   await supabase.from('pending_intent').upsert({
       user_id: userId,
-      intent: intent,
+      intent: { ...intent, width: width, height: height },
       updated_at: new Date().toISOString()
     });
 
