@@ -948,8 +948,12 @@ async function handleDirectChat(replyToken, userId, userText) {
       return await replyText(replyToken, msg);
     }
 
-    // ข้อมูลครบแล้ว ลบ pending intent
-    await supabase.from('pending_intent').delete().eq('user_id', userId);
+    // อัพเดท pending intent ด้วยข้อมูลล่าสุด เผื่อถามต่อ
+    await supabase.from('pending_intent').upsert({
+      user_id: userId,
+      intent: intent,
+      updated_at: new Date().toISOString()
+    });
 
   let { width, height } = intent;
     const curtainType = intent.curtain_type;
