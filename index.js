@@ -917,8 +917,14 @@ async function handleDirectChat(replyToken, userId, userText) {
     console.log('parsed intent:', raw);
     const intent = JSON.parse(raw);
 
-    if (intent.intent === 'order') return await handleOrderQuery(replyToken, userId, userText);
-    if (intent.intent === 'other') return await handleOtherQuery(replyToken, userId, userText, memoryText);
+   // ถ้ามี curtain_type ใหม่ที่ต่างจาก pending ให้ล้าง pending ทิ้งแล้วเริ่มใหม่
+    if (Object.keys(pendingIntent).length > 0 && 
+        intent.curtain_type && 
+        pendingIntent.curtain_type && 
+        intent.curtain_type !== pendingIntent.curtain_type) {
+      await supabase.from('pending_intent').delete().eq('user_id', userId);
+      Object.keys(pendingIntent).forEach(k => delete pendingIntent[k]);
+    }
 
    // เช็คข้อมูลที่ขาด แล้วถามทีเดียว
     const missing = [];
