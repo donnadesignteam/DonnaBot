@@ -948,14 +948,7 @@ async function handleDirectChat(replyToken, userId, userText) {
       return await replyText(replyToken, msg);
     }
 
-    // อัพเดท pending intent ด้วยข้อมูลล่าสุด เผื่อถามต่อ
-   await supabase.from('pending_intent').upsert({
-      user_id: userId,
-      intent: { ...intent, width: width, height: height },
-      updated_at: new Date().toISOString()
-    });
-
-  let { width, height } = intent;
+    let { width, height } = intent;
     const curtainType = intent.curtain_type;
     let fabric = intent.fabric || 'Dimout';
     const floors = intent.floors || 2;
@@ -970,6 +963,13 @@ async function handleDirectChat(replyToken, userId, userText) {
       width = dims.railW;
       height = dims.curtainH;
     }
+
+// อัพเดท pending intent หลังได้ width/height จริงแล้ว
+    await supabase.from('pending_intent').upsert({
+      user_id: userId,
+      intent: { ...intent, width, height },
+      updated_at: new Date().toISOString()
+    });
 
     // เช็คสูงพิเศษหลังได้ height จริงแล้ว
     const isWaveCurtain = /ลอนเทป/.test(curtainType);
