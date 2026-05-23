@@ -737,7 +737,7 @@ function recommendDimensions({ curtainType, windowType, width, height, canAddBot
   return { railW, curtainW, curtainH, qty };
 }
 
-async function getSheerRow(curtainType, fabric = '') {
+async function getSheerRow(curtainType, fabric = '', sheerFabric = '') {
   const typeMap = {
     'ม่านตาไก่': 'ผ้าโปร่งตาไก่',
     'ม่านซ่อนหู': 'ผ้าโปร่งซ่อนหู',
@@ -757,7 +757,9 @@ async function getSheerRow(curtainType, fabric = '') {
     .select('name, sub_name, price, min_price, unit')
     .eq('category', 'sheer')
     .ilike('name', '%' + sheerName + '%');
-  if (isHighSheer) {
+  if (sheerFabric) {
+    q = q.ilike('sub_name', '%' + sheerFabric + '%');
+  } else if (isHighSheer) {
     q = q.ilike('sub_name', '%สูงพิเศษ%');
   } else {
     q = q.not('sub_name', 'ilike', '%สูงพิเศษ%').not('sub_name', 'ilike', '%หนาพิเศษ%');
@@ -985,7 +987,7 @@ async function handleDirectChat(replyToken, userId, userText) {
     const [railRow, curtainRow, sheerRow] = await Promise.all([
       isBlind ? null : getPricingRow(railName, null),
       getPricingRow(curtainType, fabric),
-      floors === 2 && !isBlind ? getSheerRow(curtainType, fabric) : null,
+      floors === 2 && !isBlind ? getSheerRow(curtainType, fabric, intent.sheer_fabric) : null,
     ]);
 
 const normalizedCurtainName = curtainType.startsWith('ม่าน') ? curtainType : 'ม่าน' + curtainType;
