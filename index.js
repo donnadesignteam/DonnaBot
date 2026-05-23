@@ -891,8 +891,9 @@ async function handleDirectChat(replyToken, userId, userText) {
           max_tokens: 300,
           messages: [{ role: 'user', content:
         'อ่านข้อความแล้วตอบ JSON เท่านั้น ห้าม markdown\n' +
-        '{"intent":"price|size|order|other","curtain_type":"","fabric":"Dimout|Blackout|โปร่ง|ลินิน","floors":null,"window_type":"window|door","width":null,"height":null,"already_sized":null,"both_sides":null}\n' +
-        'intent: price=ถามราคา size=ถามขนาด order=ถามออเดอร์/สถานะ other=อื่นๆ\n' +
+       '{"intent":"price|size|order|other","curtain_type":"","fabric":"Dimout|Blackout|ลินิน","sheer_fabric":"","floors":null,"window_type":"window|door","width":null,"height":null,"already_sized":null,"both_sides":null}\n' +
+        'fabric: ผ้าทึบเท่านั้น เช่น Dimout Blackout ลินิน ถ้าไม่ได้บอกให้ใส่ null\n' +
+        'sheer_fabric: ผ้าโปร่งพิเศษ เช่น Richy ถ้าเป็นผ้าโปร่งปกติหรือไม่ได้บอกให้ใส่ว่าง\n' +
         'floors: จำนวนชั้น ถ้าไม่ได้บอกให้ใส่ null\n' +
         'already_sized: ถ้าไม่มีคำพูดเรื่องการเผื่อขนาดเลยให้ใส่ null เสมอ ห้ามเดาเด็ดขาด\n' +
         'both_sides: ถ้าไม่มีคำพูดเรื่องสองข้าง/ข้างเดียวเลยให้ใส่ null เสมอ ห้ามเดาเด็ดขาด\n' +
@@ -1028,7 +1029,7 @@ const normalizedCurtainName = curtainType.startsWith('ม่าน') ? curtainTy
       const isWaveOrPleatSheer = /ลอนเทป|จีบ|ลอนตะขอ/.test(curtainType);
       const sheerPrice = Math.round(Math.max(sheerRow.price * width, sheerRow.min_price || 0)) * (isWaveOrPleatSheer ? 1 : 2);
       const sheerTypeName = sheerTypeMap[normalizedCurtainName] || 'ผ้าโปร่ง';
-      const sheerFabricSuffix = (intent.fabric && !['Dimout','Blackout'].includes(intent.fabric)) ? ' ' + intent.fabric : '';
+      const sheerFabricSuffix = intent.sheer_fabric ? ' ' + intent.sheer_fabric : '';
       const sheerLabel = sheerTypeName + (fabric.includes('สูงพิเศษ') ? ' สูงพิเศษ' : '') + sheerFabricSuffix;
       reply += `${sheerLabel}\n${displayW.toFixed(2)}*${height.toFixed(2)} = 2 ผืน ${sheerPrice.toLocaleString()} บาท\n`;
       total += sheerPrice;
