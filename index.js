@@ -1027,7 +1027,7 @@ const normalizedCurtainName = curtainType.startsWith('ม่าน') ? curtainTy
     if (sheerRow) {
       const isWaveOrPleatSheer = /ลอนเทป|จีบ|ลอนตะขอ/.test(curtainType);
       const sheerPrice = Math.round(Math.max(sheerRow.price * width, sheerRow.min_price || 0)) * (isWaveOrPleatSheer ? 1 : 2);
-      const sheerTypeName = typeMap[normalizedCurtainName] || 'ผ้าโปร่ง';
+      const sheerTypeName = sheerTypeMap[normalizedCurtainName] || 'ผ้าโปร่ง';
       const sheerFabricSuffix = (intent.fabric && !['Dimout','Blackout'].includes(intent.fabric)) ? ' ' + intent.fabric : '';
       const sheerLabel = sheerTypeName + (fabric.includes('สูงพิเศษ') ? ' สูงพิเศษ' : '') + sheerFabricSuffix;
       reply += `${sheerLabel}\n${displayW.toFixed(2)}*${height.toFixed(2)} = 2 ผืน ${sheerPrice.toLocaleString()} บาท\n`;
