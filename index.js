@@ -964,10 +964,10 @@ async function handleDirectChat(replyToken, userId, userText) {
       height = dims.curtainH;
     }
 
-// อัพเดท pending intent หลังได้ width/height จริงแล้ว
+// อัพเดท pending intent หลังได้ width/height จริงแล้ว และ mark ว่าเผื่อแล้ว
     await supabase.from('pending_intent').upsert({
       user_id: userId,
-      intent: { ...intent, width, height },
+      intent: { ...intent, width, height, already_sized: true },
       updated_at: new Date().toISOString()
     });
 
@@ -987,10 +987,18 @@ async function handleDirectChat(replyToken, userId, userText) {
       floors === 2 && !isBlind ? getSheerRow(curtainType, fabric) : null,
     ]);
 
+const normalizedCurtainName = curtainType.startsWith('ม่าน') ? curtainType : 'ม่าน' + curtainType;
+    const sheerTypeMap = {
+      'ม่านตาไก่': 'ผ้าโปร่งตาไก่', 'ม่านซ่อนหู': 'ผ้าโปร่งซ่อนหู',
+      'ม่านลอนตะขอ': 'ผ้าโปร่งลอนตะขอ', 'ม่านคอกระเช้า': 'ผ้าโปร่งคอกระเช้า',
+      'ม่านจีบ': 'ผ้าโปร่งม่านจีบ', 'ม่านลอนเทป': 'ผ้าโปร่งลอนเทป',
+      'ม่านสอด': 'ผ้าโปร่งม่านสอด', 'ม่านลอนโซ่': 'ผ้าโปร่งลอนโซ่',
+    };
+
     const isWaveOrPleat = /ลอนเทป|จีบ|ลอนตะขอ/.test(curtainType);
     const displayW = isWaveOrPleat ? (width / 2) : width;
 
-    let reply = 'แนะนำใช้ขนาดนี้ได้ค่ะ\n';
+    let reply = 'แนะนำใช้ขนาดนี้ได้ค่ะ\n\n';
     let total = 0;
 
     if (railRow) {
@@ -1011,19 +1019,22 @@ async function handleDirectChat(replyToken, userId, userText) {
         const isWaveOrPleatPrice = /ลอนเทป|จีบ|ลอนตะขอ/.test(curtainType);
         curtainPrice = Math.round(Math.max(curtainRow.price * width, curtainRow.min_price || 0)) * (isBlind || isWaveOrPleatPrice ? 1 : 2);
         const qty = isBlind ? '1 ชุด' : '2 ผืน';
-        reply += `${curtainType} ${fabric}\n${displayW.toFixed(2)}*${height.toFixed(2)} = ${qty} ${curtainPrice.toLocaleString()} บาท\n`;
+        const curtainLabel = curtainType.startsWith('ม่าน') ? curtainType : 'ม่าน' + curtainType;
+        reply += `${curtainLabel} ${fabric}\n${displayW.toFixed(2)}*${height.toFixed(2)} = ${qty} ${curtainPrice.toLocaleString()} บาท\n`;
       }
       total += curtainPrice;
     }
     if (sheerRow) {
       const isWaveOrPleatSheer = /ลอนเทป|จีบ|ลอนตะขอ/.test(curtainType);
       const sheerPrice = Math.round(Math.max(sheerRow.price * width, sheerRow.min_price || 0)) * (isWaveOrPleatSheer ? 1 : 2);
-      const sheerLabel = fabric.includes('สูงพิเศษ') ? 'ผ้าโปร่ง สูงพิเศษ' : 'ผ้าโปร่ง';
+      const sheerTypeName = typeMap[normalizedCurtainName] || 'ผ้าโปร่ง';
+      const sheerFabricSuffix = (intent.fabric && !['Dimout','Blackout'].includes(intent.fabric)) ? ' ' + intent.fabric : '';
+      const sheerLabel = sheerTypeName + (fabric.includes('สูงพิเศษ') ? ' สูงพิเศษ' : '') + sheerFabricSuffix;
       reply += `${sheerLabel}\n${displayW.toFixed(2)}*${height.toFixed(2)} = 2 ผืน ${sheerPrice.toLocaleString()} บาท\n`;
       total += sheerPrice;
     }
 
-    reply += `รวม ${total.toLocaleString()} บาทค่ะ`;
+    reply += `รวม ${total.toLocaleString()} บาท`;
     await client.replyMessage({ replyToken, messages: [{ type: 'text', text: reply }] });
 
   } catch (err) {
