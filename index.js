@@ -752,20 +752,30 @@ async function getSheerRow(curtainType, fabric = '', sheerFabric = '') {
   const normalizedName = baseName.startsWith('ม่าน') ? baseName : 'ม่าน' + baseName;
   const sheerName = typeMap[normalizedName];
   if (!sheerName) return null;
+
+  const premiumSheers = ['richy', 'mid-modern', 'midmodern'];
+  const thickSheers = ['linen pie', 'linenpie', 'อื่นๆ', 'ไม่มีในสต็อก', 'หมด'];
   const isHighSheer = fabric.includes('สูงพิเศษ');
+  const isPremiumSheer = premiumSheers.includes(sheerFabric?.toLowerCase());
+  const isThickSheer = thickSheers.includes(sheerFabric?.toLowerCase());
+
   let q = supabase.from('pricing')
     .select('name, sub_name, price, min_price, unit')
     .eq('category', 'sheer')
     .ilike('name', '%' + sheerName + '%');
-  if (sheerFabric) {
-    q = q.ilike('sub_name', '%' + sheerFabric + '%');
-  } else if (isHighSheer) {
+
+  if (isPremiumSheer || isHighSheer) {
     q = q.ilike('sub_name', '%สูงพิเศษ%');
+  } else if (isThickSheer) {
+    q = q.ilike('sub_name', '%หนาพิเศษ%');
+  } else if (sheerFabric) {
+    q = q.ilike('sub_name', '%' + sheerFabric + '%');
   } else {
     q = q.not('sub_name', 'ilike', '%สูงพิเศษ%').not('sub_name', 'ilike', '%หนาพิเศษ%');
   }
+
   const { data, error } = await q.limit(1);
-  console.log('getSheerRow:', curtainType, '-> sheerName:', sheerName, 'rows:', data?.length, 'first:', data?.[0]?.name, data?.[0]?.price, 'error:', error?.message);
+  console.log('getSheerRow:', curtainType, '-> sheerName:', sheerName, 'sheerFabric:', sheerFabric, 'rows:', data?.length, 'first:', data?.[0]?.name, data?.[0]?.price, 'error:', error?.message);
   return data && data.length > 0 ? data[0] : null;
 }
 
@@ -895,7 +905,7 @@ async function handleDirectChat(replyToken, userId, userText) {
         'อ่านข้อความแล้วตอบ JSON เท่านั้น ห้าม markdown\n' +
        '{"intent":"price|size|order|other","curtain_type":"","fabric":"Dimout|Blackout|ลินิน","sheer_fabric":"","floors":null,"window_type":"window|door","width":null,"height":null,"already_sized":null,"both_sides":null}\n' +
         'fabric: ผ้าทึบเท่านั้น เช่น Dimout Blackout ลินิน ถ้าไม่ได้บอกให้ใส่ null\n' +
-        'sheer_fabric: ผ้าโปร่งพิเศษ เช่น Richy ถ้าเป็นผ้าโปร่งปกติหรือไม่ได้บอกให้ใส่ว่าง\n' +
+        'sheer_fabric: ระบุรุ่นผ้าโปร่ง เช่น Richy, Mid-modern, Linen Pie ถ้าไม่ได้บอกให้ใส่ว่าง\n' +
         'floors: จำนวนชั้น ถ้าไม่ได้บอกให้ใส่ null\n' +
         'already_sized: ถ้าไม่มีคำพูดเรื่องการเผื่อขนาดเลยให้ใส่ null เสมอ ห้ามเดาเด็ดขาด\n' +
         'both_sides: ถ้าไม่มีคำพูดเรื่องสองข้าง/ข้างเดียวเลยให้ใส่ null เสมอ ห้ามเดาเด็ดขาด\n' +
