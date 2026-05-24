@@ -996,7 +996,14 @@ async function handleDirectChat(replyToken, userId, userText) {
       fabric = fabric + ' สูงพิเศษ';
     }
 
-    const isBlind = /มู่ลี่|ม่านพับ|ม่านม้วน/.test(curtainType);
+    // มู่ลี่ไม้คำนวณตรงๆ ไม่ต้องดึงจาก DB
+    if (/มู่ลี่ไม้/.test(curtainType)) {
+      const area = Math.max(width * height * 1.2, 1.5);
+      const price = Math.max(area * 1290, 1548);
+      const reply = `แนะนำใช้ขนาดนี้ได้ค่ะ\n\nมู่ลี่ไม้\n${width.toFixed(2)}*${height.toFixed(2)} = 1 ชุด ${Math.round(price).toLocaleString()} บาท\nรวม ${Math.round(price).toLocaleString()} บาท`;
+      await supabase.from('pending_intent').upsert({ user_id: userId, intent: { ...intent, width, height, already_sized: true }, updated_at: new Date().toISOString() });
+      return await client.replyMessage({ replyToken, messages: [{ type: 'text', text: reply }] });
+    }
     console.log('curtainType:', curtainType, 'isBlind:', isBlind, 'floors:', floors);
     const railName = getRailName(curtainType, floors, intent.rail_type);
     const [railRow, curtainRow, sheerRow] = await Promise.all([
