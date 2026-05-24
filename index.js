@@ -948,15 +948,15 @@ async function handleDirectChat(replyToken, userId, userText) {
 
    // เช็คข้อมูลที่ขาด แล้วถามทีเดียว
     const isWoodBlind = /มู่ลี่ไม้/.test(intent.curtain_type);
-    const isAlumBlind = /มู่ลี่อลูมิเนียม|มู่ลี่ alu|มู่ลี่ aluminum/i.test(intent.curtain_type);
+    const isAlumBlind = /มู่ลี่/.test(intent.curtain_type) && !/ไม้/.test(intent.curtain_type);
     const missing = [];
     if (!intent.curtain_type) missing.push('ชนิดม่าน เช่น ม่านตาไก่ ม่านจีบ ม่านลอนเทป');
-    if (!isWoodBlind && !intent.fabric) missing.push('ชนิดผ้า เช่น Dimout หรือ Blackout');
-    if (!isWoodBlind && !intent.floors) missing.push('จำนวนชั้น เช่น 1 ชั้น หรือ 2 ชั้น (ทึบ+โปร่ง)');
+   if (!isWoodBlind && !isAlumBlind && !intent.fabric) missing.push('ชนิดผ้า เช่น Dimout หรือ Blackout');
+    if (!isWoodBlind && !isAlumBlind && !intent.floors) missing.push('จำนวนชั้น เช่น 1 ชั้น หรือ 2 ชั้น (ทึบ+โปร่ง)');
     if (intent.already_sized === null) missing.push('ขนาดเผื่อแล้วหรือยัง และเผื่อได้สองข้างหรือข้างเดียว (เช่น "ยังไม่เผื่อ สองข้าง")');
     if (intent.already_sized === false && intent.both_sides === null) missing.push('เผื่อได้สองข้างหรือข้างเดียว');
     if (isAlumBlind && !intent.aluminum_model) missing.push('รุ่นมู่ลี่อลูมิเนียม เช่น\n- KDN 25mm\n- KACEE 16มม ระบบแกนปรับเชือก\n- KACEE 25มม ระบบแกนปรับเทปเชือก\n- KACEE 25มม ระบบโซ่ดึง\n- Premium KACEE 25มม แกนปรับเทปเชือก\n- Hairline KACEE 25มม โซ่ดึง\n- KACEE 35มม แกนปรับเทปผ้า');
-    if (!isWoodBlind && !intent.window_type) missing.push('เป็นหน้าต่างหรือประตู');
+    if (!isWoodBlind && !isAlumBlind && !intent.window_type) missing.push('เป็นหน้าต่างหรือประตู');
 
     if (missing.length > 0) {
       const { error: upsertError } = await supabase.from('pending_intent').upsert({
