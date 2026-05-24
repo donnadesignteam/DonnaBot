@@ -955,7 +955,7 @@ async function handleDirectChat(replyToken, userId, userText) {
     if (!isWoodBlind && !isAlumBlind && !intent.floors) missing.push('จำนวนชั้น เช่น 1 ชั้น หรือ 2 ชั้น (ทึบ+โปร่ง)');
     if (intent.already_sized === null) missing.push('ขนาดเผื่อแล้วหรือยัง และเผื่อได้สองข้างหรือข้างเดียว (เช่น "ยังไม่เผื่อ สองข้าง")');
     if (intent.already_sized === false && intent.both_sides === null) missing.push('เผื่อได้สองข้างหรือข้างเดียว');
-    if (isAlumBlind && !intent.aluminum_model) missing.push('รุ่นมู่ลี่อลูมิเนียม เช่น\n- KDN 25mm\n- KACEE 16มม ระบบแกนปรับเชือก\n- KACEE 25มม ระบบแกนปรับเทปเชือก\n- KACEE 25มม ระบบโซ่ดึง\n- Premium KACEE 25มม แกนปรับเทปเชือก\n- Hairline KACEE 25มม โซ่ดึง\n- KACEE 35มม แกนปรับเทปผ้า');
+    if (isAlumBlind && !intent.aluminum_model) missing.push('รุ่นมู่ลี่อลูมิเนียม เช่น\n- KDN 25mm\n- KACEE 16มม ระบบแกนปรับเชือก\n- KACEE 16มม ระบบโซ่ดึง (เทปเชือก)\n- KACEE 25มม ระบบแกนปรับเทปเชือก\n- KACEE 25มม ระบบโซ่ดึง (เทปเชือก)\n- Premium KACEE 25มม แกนปรับเทปเชือก\n- Premium KACEE 25มม เชือกปรับเทปผ้า\n- Premium KACEE 25มม โซ่ดึง\n- Hairline KACEE 25มม แกนปรับเทปเชือก\n- Hairline KACEE 25มม เชือกปรับเทปผ้า\n- Hairline KACEE 25มม โซ่ดึง\n- KACEE 35มม แกนปรับเทปผ้า\n- KACEE 35มม เชือกปรับเทปผ้า\n- KACEE 35มม 2in1\n- Premium KACEE 35 แกนปรับเทปผ้า\n- Premium KACEE 35mm เชือกปรับเทปผ้า\n- Premium KACEE 35มม 2in1\n- Hairline KACEE 35มม แกนปรับเทปผ้า\n- Hairline KACEE 35มม เชือกปรับเทปผ้า\n- Hairline KACEE 35มม 2in1\n- Hairline KACEE 35มม โซ่ดึง.เชือกวน(เทปผ้า)\n- KACEE 50มม แกนปรับเทปผ้า\n- KACEE 50มม เชือกปรับเทปผ้า\n- Premium KACEE 50มม แกนปรับเทปผ้า\n- Premium KACEE 50มม เชือกปรับเทปผ้า\n- Hairline KACEE 50มม แกนปรับเทปผ้า\n- Hairline KACEE 50มม เชือกปรับเทปผ้า');
     if (!isWoodBlind && !isAlumBlind && !intent.window_type) missing.push('เป็นหน้าต่างหรือประตู');
 
     if (missing.length > 0) {
@@ -1009,7 +1009,7 @@ async function handleDirectChat(replyToken, userId, userText) {
         .from('pricing')
         .select('name, extra')
         .eq('category', 'aluminum')
-        .ilike('name', '%' + alumModel.split(' ')[0] + '%')
+        .ilike('name', '%' + alumModel + '%')
         .limit(5);
 
       let alumRow = alumRows?.find(r => r.name.toLowerCase() === alumModel.toLowerCase());
