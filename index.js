@@ -793,11 +793,12 @@ async function getPricingRow(name, subName) {
 }
 
 // ── หาชื่อราง ────────────────────────────────────────────
-function getRailName(curtainType, floors) {
-  if (/จีบ|ลอนตะขอ/.test(curtainType)) return `รางจีบ${floors}ชั้น`;
-  if (/ลอนโซ่/.test(curtainType)) return `รางลอนโซ่${floors}ชั้น`;
-  if (/ลอนเทป/.test(curtainType)) return `รางsnake${floors}ชั้น`;
-  return `ราง${floors}ชั้น`;
+function getRailName(curtainType, floors, railType = '') {
+  const suffix = railType ? ' ' + railType : '';
+  if (/จีบ|ลอนตะขอ/.test(curtainType)) return `รางจีบ${floors}ชั้น${suffix}`;
+  if (/ลอนโซ่/.test(curtainType)) return `รางลอนโซ่${floors}ชั้น${suffix}`;
+  if (/ลอนเทป/.test(curtainType)) return `รางsnake${floors}ชั้น${suffix}`;
+  return `ราง${floors}ชั้น${suffix}`;
 }
 
 // ── helper ───────────────────────────────────────────────
@@ -903,7 +904,8 @@ async function handleDirectChat(replyToken, userId, userText) {
           max_tokens: 300,
           messages: [{ role: 'user', content:
         'อ่านข้อความแล้วตอบ JSON เท่านั้น ห้าม markdown\n' +
-       '{"intent":"price|size|order|other","curtain_type":"","fabric":"Dimout|Blackout|ลินิน","sheer_fabric":"","floors":null,"window_type":"window|door","width":null,"height":null,"already_sized":null,"both_sides":null}\n' +
+       '{"intent":"price|size|order|other","curtain_type":"","fabric":"Dimout|Blackout|ลินิน","sheer_fabric":"","rail_type":"","floors":null,"window_type":"window|door","width":null,"height":null,"already_sized":null,"both_sides":null}\n' +
+        'rail_type: ชนิดราง เช่น ลายไม้ อลูมิเนียม ถ้าไม่ได้บอกให้ใส่ว่าง\n' +
         'fabric: ผ้าทึบเท่านั้น เช่น Dimout Blackout ลินิน ถ้าไม่ได้บอกให้ใส่ null\n' +
         'sheer_fabric: ระบุรุ่นผ้าโปร่ง เช่น Richy, Mid-modern, Linen Pie ถ้าไม่ได้บอกให้ใส่ว่าง\n' +
         'floors: จำนวนชั้น ถ้าไม่ได้บอกให้ใส่ null\n' +
@@ -993,7 +995,7 @@ async function handleDirectChat(replyToken, userId, userText) {
 
     const isBlind = /มู่ลี่|ม่านพับ|ม่านม้วน/.test(curtainType);
     console.log('curtainType:', curtainType, 'isBlind:', isBlind, 'floors:', floors);
-    const railName = getRailName(curtainType, floors);
+    const railName = getRailName(curtainType, floors, intent.rail_type);
     const [railRow, curtainRow, sheerRow] = await Promise.all([
       isBlind ? null : getPricingRow(railName, null),
       getPricingRow(curtainType, fabric),
