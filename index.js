@@ -781,11 +781,10 @@ async function getSheerRow(curtainType, fabric = '', sheerFabric = '') {
 
 // ── ดึงราคาจาก Supabase ──────────────────────────────────
 async function getPricingRow(name, subName) {
-  const mainKeyword = name.split(/\s+/)[0];
   let q = supabase.from('pricing')
     .select('name, sub_name, price, min_price, unit')
     .neq('unit', 'matrix')
-    .ilike('name', '%' + mainKeyword + '%');
+    .ilike('name', '%' + name + '%');
   if (subName) q = q.ilike('sub_name', '%' + subName + '%');
   const { data } = await q.limit(3);
   console.log('getPricingRow:', name, subName, '->', data?.[0]?.name, data?.[0]?.sub_name);
@@ -997,7 +996,7 @@ async function handleDirectChat(replyToken, userId, userText) {
     console.log('curtainType:', curtainType, 'isBlind:', isBlind, 'floors:', floors);
     const railName = getRailName(curtainType, floors, intent.rail_type);
     const [railRow, curtainRow, sheerRow] = await Promise.all([
-      isBlind ? null : getPricingRow(railName, null),
+      isBlind ? null : getPricingRow(railName, intent.rail_type || null),
       getPricingRow(curtainType, fabric),
       floors === 2 && !isBlind ? getSheerRow(curtainType, fabric, intent.sheer_fabric) : null,
     ]);
