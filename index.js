@@ -1002,6 +1002,34 @@ async function handleDirectChat(replyToken, userId, userText) {
       fabric = fabric + ' สูงพิเศษ';
     }
 
+    // มู่ลี่อลูมิเนียม ดึงราคาจาก matrix ใน DB
+    if (isAlumBlind) {
+      const alumModel = intent.aluminum_model || '';
+      const { data: alumRows } = await supabase
+        .from('pricing')
+        .select('name, extra')
+        .eq('category', 'aluminum')
+        .ilike('name', '%' + alumModel.split(' ')[0] + '%')
+        .limit(5);
+
+      let alumRow = alumRows?.find(r => r.name.toLowerCase() === alumModel.toLowerCase());
+      if (!alumRow) alumRow = alumRows?.[0];
+
+      if (alumRow?.extra) {
+        const matrix = typeof alumRow.extra === 'string' ? JSON.parse(alumRow.extra) : alumRow.extra;
+        const wi = matrix.widths.findIndex(v => v >= width);
+        const hi = matrix.heights.findIndex(v => v >= height);
+
+        if (wi >= 0 && hi >= 0 && matrix.prices[hi]?.[wi]) {
+          const price = matrix.prices[hi][wi];
+          const reply = `แนะนำใช้ขนาดนี้ได้ค่ะ\n\nมู่ลี่อลูมิเนียม ${alumRow.name}\n${width.toFixed(2)}*${height.toFixed(2)} = 1 ชุด ${price.toLocaleString()} บาท\nรวม ${price.toLocaleString()} บาท`;
+          await supabase.from('pending_intent').upsert({ user_id: userId, intent: { ...intent, width, height, already_sized: true }, updated_at: new Date().toISOString() });
+          return await client.replyMessage({ replyToken, messages: [{ type: 'text', text: reply }] });
+        }
+      }
+      return await replyText(replyToken, `ขออภัยค่ะ ขนาด ${width.toFixed(2)}*${height.toFixed(2)} เกินช่วงในตารางราคาค่ะ`);
+    }
+
     // มู่ลี่ไม้คำนวณตรงๆ ไม่ต้องดึงจาก DB
     if (/มู่ลี่ไม้/.test(curtainType)) {
       const area = Math.max(width * height * 1.2, 1.5);
