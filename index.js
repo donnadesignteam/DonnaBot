@@ -907,7 +907,8 @@ async function handleDirectChat(replyToken, userId, userText) {
           max_tokens: 300,
           messages: [{ role: 'user', content:
         'อ่านข้อความแล้วตอบ JSON เท่านั้น ห้าม markdown\n' +
-       '{"intent":"price|size|order|other","curtain_type":"","fabric":"Dimout|Blackout|ลินิน","sheer_fabric":"","rail_type":"","floors":null,"window_type":"window|door","width":null,"height":null,"already_sized":null,"both_sides":null}\n' +
+       '{"intent":"price|size|order|other","curtain_type":"","fabric":"Dimout|Blackout|ลินิน","sheer_fabric":"","rail_type":"","aluminum_model":"","floors":null,"window_type":"window|door","width":null,"height":null,"already_sized":null,"both_sides":null}\n' +
+        'aluminum_model: รุ่นมู่ลี่อลูมิเนียม เช่น KDN 25mm, KACEE 25mm ถ้าไม่ได้บอกให้ใส่ว่าง\n' +
         'rail_type: ชนิดราง เช่น ลายไม้ อลูมิเนียม ถ้าไม่ได้บอกให้ใส่ว่าง\n' +
         'fabric: ผ้าทึบเท่านั้น เช่น Dimout Blackout ลินิน ถ้าไม่ได้บอกให้ใส่ null\n' +
         'sheer_fabric: ระบุรุ่นผ้าโปร่ง เช่น Richy, Mid-modern, Linen Pie ถ้าไม่ได้บอกให้ใส่ว่าง\n' +
@@ -947,12 +948,14 @@ async function handleDirectChat(replyToken, userId, userText) {
 
    // เช็คข้อมูลที่ขาด แล้วถามทีเดียว
     const isWoodBlind = /มู่ลี่ไม้/.test(intent.curtain_type);
+    const isAlumBlind = /มู่ลี่อลูมิเนียม|มู่ลี่ alu|มู่ลี่ aluminum/i.test(intent.curtain_type);
     const missing = [];
     if (!intent.curtain_type) missing.push('ชนิดม่าน เช่น ม่านตาไก่ ม่านจีบ ม่านลอนเทป');
     if (!isWoodBlind && !intent.fabric) missing.push('ชนิดผ้า เช่น Dimout หรือ Blackout');
     if (!isWoodBlind && !intent.floors) missing.push('จำนวนชั้น เช่น 1 ชั้น หรือ 2 ชั้น (ทึบ+โปร่ง)');
     if (intent.already_sized === null) missing.push('ขนาดเผื่อแล้วหรือยัง และเผื่อได้สองข้างหรือข้างเดียว (เช่น "ยังไม่เผื่อ สองข้าง")');
     if (intent.already_sized === false && intent.both_sides === null) missing.push('เผื่อได้สองข้างหรือข้างเดียว');
+    if (isAlumBlind && !intent.aluminum_model) missing.push('รุ่นมู่ลี่อลูมิเนียม เช่น\n- KDN 25mm\n- KACEE 16มม ระบบแกนปรับเชือก\n- KACEE 25มม ระบบแกนปรับเทปเชือก\n- KACEE 25มม ระบบโซ่ดึง\n- Premium KACEE 25มม แกนปรับเทปเชือก\n- Hairline KACEE 25มม โซ่ดึง\n- KACEE 35มม แกนปรับเทปผ้า');
     if (!isWoodBlind && !intent.window_type) missing.push('เป็นหน้าต่างหรือประตู');
 
     if (missing.length > 0) {
