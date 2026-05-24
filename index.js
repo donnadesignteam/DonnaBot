@@ -945,13 +945,14 @@ async function handleDirectChat(replyToken, userId, userText) {
     }
 
    // เช็คข้อมูลที่ขาด แล้วถามทีเดียว
+    const isWoodBlind = /มู่ลี่ไม้/.test(intent.curtain_type);
     const missing = [];
-  if (!intent.curtain_type) missing.push('ชนิดม่าน เช่น ม่านตาไก่ ม่านจีบ ม่านลอนเทป');
-    if (!intent.fabric) missing.push('ชนิดผ้า เช่น Dimout หรือ Blackout');
-    if (!intent.floors) missing.push('จำนวนชั้น เช่น 1 ชั้น หรือ 2 ชั้น (ทึบ+โปร่ง)');
+    if (!intent.curtain_type) missing.push('ชนิดม่าน เช่น ม่านตาไก่ ม่านจีบ ม่านลอนเทป');
+    if (!isWoodBlind && !intent.fabric) missing.push('ชนิดผ้า เช่น Dimout หรือ Blackout');
+    if (!isWoodBlind && !intent.floors) missing.push('จำนวนชั้น เช่น 1 ชั้น หรือ 2 ชั้น (ทึบ+โปร่ง)');
     if (intent.already_sized === null) missing.push('ขนาดเผื่อแล้วหรือยัง และเผื่อได้สองข้างหรือข้างเดียว (เช่น "ยังไม่เผื่อ สองข้าง")');
     if (intent.already_sized === false && intent.both_sides === null) missing.push('เผื่อได้สองข้างหรือข้างเดียว');
-    if (!intent.window_type) missing.push('เป็นหน้าต่างหรือประตู');
+    if (!isWoodBlind && !intent.window_type) missing.push('เป็นหน้าต่างหรือประตู');
 
     if (missing.length > 0) {
       const { error: upsertError } = await supabase.from('pending_intent').upsert({
@@ -1004,6 +1005,7 @@ async function handleDirectChat(replyToken, userId, userText) {
       await supabase.from('pending_intent').upsert({ user_id: userId, intent: { ...intent, width, height, already_sized: true }, updated_at: new Date().toISOString() });
       return await client.replyMessage({ replyToken, messages: [{ type: 'text', text: reply }] });
     }
+    const isBlind = /มู่ลี่|ม่านพับ|ม่านม้วน/.test(curtainType);
     console.log('curtainType:', curtainType, 'isBlind:', isBlind, 'floors:', floors);
     const railName = getRailName(curtainType, floors, intent.rail_type);
     const [railRow, curtainRow, sheerRow] = await Promise.all([
