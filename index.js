@@ -910,7 +910,7 @@ async function handleDirectChat(replyToken, userId, userText) {
        '{"intent":"price|size|order|other","curtain_type":"","fabric":"Dimout|Blackout|ลินิน","sheer_fabric":"","rail_type":"","aluminum_model":"","floors":null,"window_type":"window|door","width":null,"height":null,"already_sized":null,"both_sides":null}\n' +
         'aluminum_model: รุ่นมู่ลี่อลูมิเนียม เช่น KDN 25mm, KACEE 25mm ถ้าไม่ได้บอกให้ใส่ว่าง\n' +
         'rail_type: ชนิดราง เช่น ลายไม้ อลูมิเนียม ถ้าไม่ได้บอกให้ใส่ว่าง\n' +
-        'fabric: ผ้าทึบเท่านั้น เช่น Dimout Blackout ลินิน ถ้าไม่ได้บอกให้ใส่ null\n' +
+        'curtain_type: ชนิดม่านหรือมู่ลี่ เช่น ม่านตาไก่ มู่ลี่ไม้ มู่ลี่อลูมิเนียม ถ้าบอกว่ามู่ลี่อลูมิเนียมให้ใส่ "มู่ลี่อลูมิเนียม" เสมอ\n' +
         'sheer_fabric: ระบุรุ่นผ้าโปร่ง เช่น Richy, Mid-modern, Linen Pie ถ้าไม่ได้บอกให้ใส่ว่าง\n' +
         'floors: จำนวนชั้น ถ้าไม่ได้บอกให้ใส่ null\n' +
         'already_sized: ถ้าไม่มีคำพูดเรื่องการเผื่อขนาดเลยให้ใส่ null เสมอ ห้ามเดาเด็ดขาด\n' +
