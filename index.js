@@ -702,7 +702,7 @@ async function handleUnsend(event) {
 }
 
 // ── คำนวณขนาดม่านพร้อมเผื่อ ─────────────────────────────
-function recommendDimensions({ curtainType, windowType, width, height, canAddBothSides }) {
+function recommendDimensions({ curtainType, windowType, width, height, canAddBothSides, canAddBothSidesH = true }) {
   const isPleat   = /จีบ/.test(curtainType);
   const isWave    = /ลอนเทป/.test(curtainType);
   const isChain   = /ลอนโซ่/.test(curtainType);
@@ -731,7 +731,7 @@ function recommendDimensions({ curtainType, windowType, width, height, canAddBot
   } else if (/ม่านพับ/.test(curtainType)) {
     curtainH = height + 0.50;
   } else {
-    curtainH = windowType === 'door' ? height + 0.20 : height + 0.40;
+    curtainH = windowType === 'door' ? height + (canAddBothSidesH ? 0.20 : 0.10) : height + (canAddBothSidesH ? 0.40 : 0.20);
   }
   curtainH = Math.round(curtainH * 100) / 100;
   return { railW, curtainW, curtainH, qty };
@@ -914,6 +914,7 @@ async function handleDirectChat(replyToken, userId, userText) {
         'floors: จำนวนชั้น ถ้าไม่ได้บอกให้ใส่ null\n' +
         'already_sized: ถ้าไม่มีคำพูดเรื่องการเผื่อขนาดเลยให้ใส่ null เสมอ ห้ามเดาเด็ดขาด\n' +
         'both_sides: ถ้าไม่มีคำพูดเรื่องสองข้าง/ข้างเดียวเลยให้ใส่ null เสมอ ห้ามเดาเด็ดขาด\n' +
+        'height_both_sides: true=เผื่อสูงได้ทั้งบนและล่าง false=เผื่อสูงได้แค่ด้านเดียว ถ้าไม่ได้บอกให้ใส่ true\n' +
         'both_sides: ต้องมีคำว่าสองข้าง/ข้างเดียวถึงกำหนดค่า ถ้าไม่มีให้ใส่ null เสมอ\n' +
         'window_type: ต้องมีคำว่าประตู/หน้าต่างถึงกำหนดค่า ถ้าไม่มีให้ใส่ null เสมอ\n' +
         'floors: ต้องมีตัวเลขหรือคำว่ากี่ชั้นถึงกำหนดค่า ถ้าไม่มีให้ใส่ null เสมอ\n' +
@@ -977,7 +978,8 @@ async function handleDirectChat(replyToken, userId, userText) {
       if (intent.both_sides === null) return await replyText(replyToken, 'เผื่อได้สองข้างหรือข้างเดียวคะ');
       const dims = recommendDimensions({
         curtainType, windowType, width, height,
-        canAddBothSides: intent.both_sides !== false
+        canAddBothSides: intent.both_sides !== false,
+        canAddBothSidesH: intent.height_both_sides !== false
       });
       width = dims.railW;
       height = dims.curtainH;
