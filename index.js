@@ -43,7 +43,7 @@ async function handleEvent(event) {
   if (event.type !== 'message') return;
   const { replyToken, message } = event;
   const groupId = event.source.groupId;
-  console.log('incoming groupId:', groupId, 'type:', message.type);
+  console.log('incoming groupId:', groupId, 'userId:', event.source.userId, 'type:', message.type);
 
   const GROUP_ORDER = process.env.GROUP_ORDER;
   const GROUP_CUT = process.env.GROUP_CUT;
@@ -908,7 +908,8 @@ async function handleDirectChat(replyToken, userId, userText) {
           messages: [{ role: 'user', content:
         'อ่านข้อความแล้วตอบ JSON เท่านั้น ห้าม markdown\n' +
        '{"intent":"price|size|order|other","curtain_type":"","fabric":"Dimout|Blackout|ลินิน","sheer_fabric":"","rail_type":"","aluminum_model":"","floors":null,"window_type":"window|door","width":null,"height":null,"already_sized":null,"both_sides":null}\n' +
-        'aluminum_model: รุ่นมู่ลี่อลูมิเนียม เช่น KDN 25mm, KACEE 25mm ถ้าไม่ได้บอกให้ใส่ว่าง\n' +
+       'intent: "order"=ถามเกี่ยวกับออเดอร์ที่มีอยู่ เช่น มีอะไรบ้าง สถานะเป็นยังไง ถามเรื่องเลขออเดอร์ที่เคยสั่ง\n' + 
+       'aluminum_model: รุ่นมู่ลี่อลูมิเนียม เช่น KDN 25mm, KACEE 25mm ถ้าไม่ได้บอกให้ใส่ว่าง\n' +
         'rail_type: ชนิดราง เช่น ลายไม้ อลูมิเนียม ถ้าไม่ได้บอกให้ใส่ว่าง\n' +
         'curtain_type: ชนิดม่านหรือมู่ลี่ เช่น ม่านตาไก่ มู่ลี่ไม้ มู่ลี่อลูมิเนียม ถ้าบอกว่ามู่ลี่อลูมิเนียมให้ใส่ "มู่ลี่อลูมิเนียม" เสมอ\n' +
         'sheer_fabric: ระบุรุ่นผ้าโปร่ง เช่น Richy, Mid-modern, Linen Pie ถ้าไม่ได้บอกให้ใส่ว่าง\n' +
