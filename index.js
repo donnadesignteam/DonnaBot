@@ -946,6 +946,32 @@ async function handleDirectChat(replyToken, userId, userText) {
       }
     }
 
+    // ถ้าถามเรื่องออเดอร์
+    if (intent.intent === 'order') {
+      const orderNumMatch = userText.match(/[A-Z0-9]{8,}/);
+      const orderNum = orderNumMatch ? orderNumMatch[0] : '';
+      if (orderNum) {
+        const { data: order } = await supabase
+          .from('orders')
+          .select('*')
+          .or(`order_number.ilike.%${orderNum}%,customer_name.ilike.%${orderNum}%`)
+          .limit(1)
+          .maybeSingle();
+        if (order) {
+          const itemsText = (order.items || []).map(i => {
+            const size = i.height ? `${i.width}*${i.height}` : `ยาว ${i.width} ม.`;
+            return `- ${i.curtain_type} ${i.color_name || ''} ${size} = ${i.quantity} ${i.unit}`;
+          }).join('\n');
+          const replyMsg = `ออเดอร์ ${order.order_number || order.customer_name}\nลูกค้า: ${order.customer_name || order.order_number}\nช่องทาง: ${order.platform || '-'}\nวันที่: ${order.order_date || '-'}\nสถานะ: ${order.status || '-'}\nรายการ:\n${itemsText}\nหมายเหตุ: ${order.note || '-'}`;
+          await supabase.from('pending_intent').delete().eq('user_id', userId);
+          return await replyText(replyToken, replyMsg);
+        } else {
+          await supabase.from('pending_intent').delete().eq('user_id', userId);
+          return await replyText(replyToken, `ไม่พบออเดอร์ ${orderNum} ในระบบค่ะ`);
+        }
+      }
+    }
+
    // เช็คข้อมูลที่ขาด แล้วถามทีเดียว
     const isWoodBlind = /มู่ลี่ไม้/.test(intent.curtain_type);
     const isAlumBlind = /มู่ลี่/.test(intent.curtain_type) && !/ไม้/.test(intent.curtain_type);
