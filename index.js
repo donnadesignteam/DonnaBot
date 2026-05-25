@@ -655,6 +655,7 @@ cron.schedule('0 8 * * *', async () => {
       const list = pending.map(o => o.order_number || o.customer_name).join('\n');
       const msg = '‼️งานที่ยังไม่ได้อัพเดท‼️\n' + list;
       await client.pushMessage({ to: process.env.ADMIN_USER_ID, messages: [{ type: 'text', text: msg }] });
+    }
 
     // แจ้งเตือน deadline วันนี้
     const todayStr = bangkokTime.toISOString().split('T')[0];
@@ -672,6 +673,7 @@ cron.schedule('0 8 * * *', async () => {
       }).join('\n');
       const msg = '🔥🔥ออเดอร์ส่งด่วนภายในวันนี้ ' + d + '🔥🔥\n' + orderList;
       await client.pushMessage({ to: process.env.ADMIN_USER_ID, messages: [{ type: 'text', text: msg }] });
+    }
 
   } catch (err) { console.error('cron 8am error:', err); }
 }, { timezone: 'Asia/Bangkok' });
