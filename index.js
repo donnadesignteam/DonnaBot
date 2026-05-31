@@ -501,7 +501,8 @@ console.log('cron orders:', orders?.length, 'error:', ordersError?.message, 'tod
 
     const msg = 'สรุปออเดอร์วันที่ ' + today + '\n\nออเดอร์ถึงช่างตัด\n' + cut + '\n\nออเดอร์ถึงงานเย็บ\n' + sew + '\n\nออเดอร์ถึงช่างรีด\n' + iron + '\n\nออเดอร์ถึงแพ็ค\n' + pack;
 
-    await client.pushMessage({ to: process.env.GROUP_ADMIN, messages: [{ type: 'text', text: msg }] });
+    await client.pushMessage({ to: process.env.ADMIN_USER_ID, messages: [{ type: 'text', text: msg }] });
+await client.pushMessage({ to: process.env.ADMIN_USER_ID_2, messages: [{ type: 'text', text: msg }] });
   } catch (err) { console.error(err); }
 }, { timezone: 'Asia/Bangkok' });
 
@@ -655,6 +656,7 @@ cron.schedule('0 8 * * *', async () => {
       const list = pending.map(o => o.order_number || o.customer_name).join('\n');
       const msg = '‼️งานที่ยังไม่ได้อัพเดท‼️\n' + list;
       await client.pushMessage({ to: process.env.ADMIN_USER_ID, messages: [{ type: 'text', text: msg }] });
+await client.pushMessage({ to: process.env.ADMIN_USER_ID_2, messages: [{ type: 'text', text: msg }] });
     }
 
     // แจ้งเตือน deadline วันนี้
@@ -673,6 +675,7 @@ cron.schedule('0 8 * * *', async () => {
       }).join('\n');
       const msg = '🔥🔥ออเดอร์ส่งด่วนภายในวันนี้ ' + d + '🔥🔥\n' + orderList;
       await client.pushMessage({ to: process.env.ADMIN_USER_ID, messages: [{ type: 'text', text: msg }] });
+      await client.pushMessage({ to: process.env.ADMIN_USER_ID_2, messages: [{ type: 'text', text: msg }] });
     }
 
   } catch (err) { console.error('cron 8am error:', err); }
