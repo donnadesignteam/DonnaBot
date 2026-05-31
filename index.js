@@ -959,9 +959,6 @@ async function handleDirectChat(replyToken, userId, userText) {
 
     // ถ้าถามเรื่องออเดอร์
     if (intent.intent === 'order') {
-
-    // ถ้าถามเรื่องออเดอร์
-    if (intent.intent === 'order') {
       const orderNumMatch = userText.match(/[A-Z0-9]{8,}/);
       const orderNum = orderNumMatch ? orderNumMatch[0] : '';
       if (orderNum) {
@@ -983,10 +980,10 @@ async function handleDirectChat(replyToken, userId, userText) {
           await supabase.from('pending_intent').delete().eq('user_id', userId);
           return await replyText(replyToken, `ไม่พบออเดอร์ ${orderNum} ในระบบค่ะ`);
         }
-      }
     }
 
-   // เช็คข้อมูลที่ขาด แล้วถามทีเดียว
+    
+   // เช็คข้อมูลที่ขาดแล้วถามทีเดียว
     const isWoodBlind = /มู่ลี่ไม้/.test(intent.curtain_type);
     const isAlumBlind = /มู่ลี่/.test(intent.curtain_type) && !/ไม้/.test(intent.curtain_type);
     const missing = [];
