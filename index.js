@@ -950,6 +950,16 @@ async function handleDirectChat(replyToken, userId, userText) {
       }
     }
 
+    // ถ้าเป็นการคุยทั่วไป ไม่เกี่ยวกับราคาหรือออเดอร์
+    if (intent.intent === 'other') {
+      await supabase.from('pending_intent').delete().eq('user_id', userId);
+      await handleOtherQuery(replyToken, userId, userText, memoryText);
+      return;
+    }
+
+    // ถ้าถามเรื่องออเดอร์
+    if (intent.intent === 'order') {
+
     // ถ้าถามเรื่องออเดอร์
     if (intent.intent === 'order') {
       const orderNumMatch = userText.match(/[A-Z0-9]{8,}/);
