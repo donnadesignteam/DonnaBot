@@ -982,7 +982,7 @@ async function handleDirectChat(replyToken, userId, userText) {
         }
     }
 
-    
+
    // เช็คข้อมูลที่ขาดแล้วถามทีเดียว
     const isWoodBlind = /มู่ลี่ไม้/.test(intent.curtain_type);
     const isAlumBlind = /มู่ลี่/.test(intent.curtain_type) && !/ไม้/.test(intent.curtain_type);
@@ -1159,6 +1159,7 @@ const normalizedCurtainName = curtainType.startsWith('ม่าน') ? curtainTy
 
     reply += `รวม ${total.toLocaleString()} บาท`;
     await client.replyMessage({ replyToken, messages: [{ type: 'text', text: reply }] });
+  }
 
   } catch (err) {
     console.error('handleDirectChat error:', err);
