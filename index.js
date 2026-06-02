@@ -363,9 +363,10 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
     const status = statusMap[groupId];
 
     for (const orderNum of data.order_numbers) {
-      const isNameBased = orderNum.includes(':');
-      const orderName = isNameBased ? orderNum.split(':')[1].trim() : null;
-      const orderNumber = isNameBased ? null : orderNum;
+      const clean = orderNum.includes(':') ? orderNum.split(':')[1].trim() : orderNum.trim();
+      const isValidOrderNumber = /^\d{16}$/.test(clean) || /^\d{18,19}$/.test(clean) || /^[A-Z0-9]{14}$/.test(clean);
+      const orderNumber = isValidOrderNumber ? clean : null;
+      const orderName = isValidOrderNumber ? null : clean;
 
       const query = isNameBased
         ? supabase.from('work_status').select('id').eq('order_name', orderName).limit(1)
