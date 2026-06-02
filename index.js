@@ -310,7 +310,7 @@ const { data: examples } = await supabase
       content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: rotated } });
     }
 
-    content.push({ type: 'text', text: exampleText + 'ส่งภาพ 2 เวอร์ชั่น ต้นฉบับและหมุน 270 องศา ให้เลือกเวอร์ชั่นที่อ่านเลขออเดอร์ได้ชัดที่สุด เลขออเดอร์อยู่บรรทัดที่ 3 ถัดจากวันที่และชื่อ platform+ลูกค้า รูปแบบเช่น 260417ZXA1VJVQ (Shopee ขึ้นต้นด้วย 26) หรือ 583866734348764827 (Tiktok เป็นตัวเลขล้วนยาว 18-19 หลักถัดจากชื่อลูกค้า) หรือ (Lazada เป็นตัวเลขยาว 1082651067631474) ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false,"use_customer_name":false} กฎ: 1) ไม่ใช่วันที่ 2) ไม่ใช่ชื่อลูกค้า 3) ถ้ามีสิ่งปิดทับบนตัวเลขออเดอร์โดยตรงจนอ่านไม่ออกให้ unclear:true แต่ถ้าเทปหรือสติ๊กเกอร์อยู่คนละบรรทัดกับเลขออเดอร์ให้อ่านได้ปกติ 4) ถ้าไม่มั่นใจให้ unclear:true 5) ห้ามเดา 6) ถ้าเลขออเดอร์โดนปิดหรือไม่มีเลยให้ใส่ platform_ชื่อลูกค้า แทนใน order_numbers เช่น "tiktok: AAA","Shopee: BBB","FB: CCC","Facebook: DDD","LineOA: EEE","Lazada: FFF" และ unclear:false ในกรณีนี้' });
+    content.push({ type: 'text', text: exampleText + 'ส่งภาพ 2 เวอร์ชั่น ต้นฉบับและหมุน 270 องศา ให้เลือกเวอร์ชั่นที่อ่านเลขออเดอร์ได้ชัดที่สุด เลขออเดอร์อยู่บรรทัดที่ 3 ถัดจากวันที่และชื่อ platform+ลูกค้า รูปแบบเช่น 260417ZXA1VJVQ (Shopee ขึ้นต้นด้วย 26 ยาว 14 ตัว) หรือ 583866734348764827 (Tiktok เป็นตัวเลขล้วนยาว 18-19 หลักถัดจากชื่อลูกค้า) หรือ (Lazada เป็นตัวเลขยาว 16 หลัก เช่น 1082651067631474) ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false,"use_customer_name":false} กฎ: 1) ไม่ใช่วันที่ 2) ไม่ใช่ชื่อลูกค้า 3) ถ้ามีสิ่งปิดทับบนตัวเลขออเดอร์โดยตรงจนอ่านไม่ออกให้ unclear:true แต่ถ้าเทปหรือสติ๊กเกอร์อยู่คนละบรรทัดกับเลขออเดอร์ให้อ่านได้ปกติ 4) ถ้าไม่มั่นใจให้ unclear:true 5) ห้ามเดา 6) ถ้าเลขออเดอร์โดนปิดหรือไม่มีเลยให้ใส่ platform_ชื่อลูกค้า แทนใน order_numbers เช่น "tiktok: AAA","Shopee: BBB","FB: CCC","Facebook: DDD","LineOA: EEE","Lazada: FFF" และ unclear:false ในกรณีนี้ 7) ตรวจสอบความยาวเลขออเดอร์: Shopee ต้องมี 14 ตัวพอดี, Tiktok ต้องมี 18-19 หลักพอดี, Lazada ต้องมี 16 หลักพอดี — ถ้าอ่านได้แต่จำนวนตัวไม่ตรงให้ใช้ format platform:ชื่อลูกค้า แทน อย่าเดาตัวที่ขาด' });
 
     let response;
     for (let attempt = 1; attempt <= 3; attempt++) {
@@ -363,19 +363,24 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
     const status = statusMap[groupId];
 
     for (const orderNum of data.order_numbers) {
-      const { data: existing } = await supabase
-        .from('work_status')
-        .select('id')
-        .eq('order_number', orderNum)
-        .limit(1);
+      const isNameBased = orderNum.includes(':');
+      const orderName = isNameBased ? orderNum.split(':')[1].trim() : null;
+      const orderNumber = isNameBased ? null : orderNum;
+
+      const query = isNameBased
+        ? supabase.from('work_status').select('id').eq('order_name', orderName).limit(1)
+        : supabase.from('work_status').select('id').eq('order_number', orderNumber).limit(1);
+
+      const { data: existing } = await query;
 
       if (existing && existing.length > 0) {
-        await supabase.from('work_status')
-          .update({ status, status_updated_at: new Date().toISOString() })
-          .eq('order_number', orderNum);
+        const updateQuery = isNameBased
+          ? supabase.from('work_status').update({ status, status_updated_at: new Date().toISOString() }).eq('order_name', orderName)
+          : supabase.from('work_status').update({ status, status_updated_at: new Date().toISOString() }).eq('order_number', orderNumber);
+        await updateQuery;
       } else {
         await supabase.from('work_status')
-          .insert([{ order_number: orderNum, status }]);
+          .insert([{ order_number: orderNumber, order_name: orderName, status }]);
       }
     }
 
