@@ -414,7 +414,7 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
     if (isTest) {
       await client.replyMessage({
         replyToken,
-        messages: [{ type: 'text', text: '🧪 ทดสอบการอ่าน (ไม่บันทึกลงระบบ)\nวันที่: ' + dateStr + '\nออเดอร์:\n' + reads.join('\n') + '\nสถานะ: ถ้าบันทึกลง Supabase จะลงคอลัมน์ตามด้านบน (โหมดทดสอบ ไม่บันทึกจริง)' }]
+        messages: [{ type: 'text', text: '🧪 ทดสอบการอ่าน (ไม่บันทึกลงระบบ)\nวันที่: ' + dateStr + '\nออเดอร์:\n' + reads.join('\n') }]
       });
       return;
     }
