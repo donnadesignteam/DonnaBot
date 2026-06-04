@@ -368,11 +368,21 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
 
     const reads = [];
     for (const orderNum of data.order_numbers) {
-      const isNameBased = orderNum.includes(':');
-      const orderName = isNameBased ? orderNum.split(':')[1].trim() : null;
-      const orderNumber = isNameBased ? null : orderNum;
+      let isNameBased, orderName, orderNumber;
+      if (isTest) {
+        // กลุ่มทดสอบ: แยกชื่อ/ออเดอร์จากรูปแบบเลขจริง ไม่พึ่งเครื่องหมาย :
+        const clean = orderNum.includes(':') ? orderNum.split(':')[1].trim() : orderNum.trim();
+        const isValidOrderNumber = /^\d{16}$/.test(clean) || /^\d{18,19}$/.test(clean) || /^[A-Z0-9]{14}$/.test(clean);
+        isNameBased = !isValidOrderNumber;
+        orderNumber = isValidOrderNumber ? clean : null;
+        orderName = isValidOrderNumber ? null : clean;
+      } else {
+        isNameBased = orderNum.includes(':');
+        orderName = isNameBased ? orderNum.split(':')[1].trim() : null;
+        orderNumber = isNameBased ? null : orderNum;
+      }
 
-      reads.push(orderNum + ' → ' + (isNameBased ? 'อ่านเป็นชื่อลูกค้า (platform:ชื่อ)' : 'อ่านเป็นเลขออเดอร์'));
+      reads.push(orderNum + ' → ' + (isNameBased ? ('ชื่อลูกค้า: ' + orderName) : ('เลขออเดอร์: ' + orderNumber)));
 
       if (isTest) continue;
 
