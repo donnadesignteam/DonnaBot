@@ -278,6 +278,7 @@ async function handleOrderText(replyToken, text, messageId = '') {
 // อ่านภาพจากกลุ่มช่าง ดูแค่เลขออเดอร์
 async function handleWorkImage(replyToken, messageId, groupId) {
   try {
+    const isTest = groupId === GROUP_TEST;
     const lineResponse = await fetch(`https://api-data.line.me/v2/bot/message/${messageId}/content`, {
       headers: { Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}` }
     });
@@ -313,7 +314,7 @@ const { data: examples } = await supabase
       content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: rotated } });
     }
 
-    content.push({ type: 'text', text: exampleText + 'ส่งภาพ 2 เวอร์ชั่น ต้นฉบับและหมุน 270 องศา ให้เลือกเวอร์ชั่นที่อ่านเลขออเดอร์ได้ชัดที่สุด เลขออเดอร์อยู่บรรทัดที่ 3 ถัดจากวันที่และชื่อ platform+ลูกค้า รูปแบบเช่น 260417ZXA1VJVQ (Shopee ขึ้นต้นด้วย 26 ยาว 14 ตัว) หรือ 583866734348764827 (Tiktok เป็นตัวเลขล้วนยาว 18-19 หลักถัดจากชื่อลูกค้า) หรือ (Lazada เป็นตัวเลขยาว 16 หลัก เช่น 1082651067631474) ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false,"use_customer_name":false} กฎ: 1) ไม่ใช่วันที่ 2) ไม่ใช่ชื่อลูกค้า 3) ถ้ามีสิ่งปิดทับบนตัวเลขออเดอร์โดยตรงจนอ่านไม่ออกให้ unclear:true แต่ถ้าเทปหรือสติ๊กเกอร์อยู่คนละบรรทัดกับเลขออเดอร์ให้อ่านได้ปกติ 4) ถ้าไม่มั่นใจให้ unclear:true 5) ห้ามเดา 6) ถ้าเลขออเดอร์โดนปิดหรือไม่มีเลยให้ใส่ platform_ชื่อลูกค้า แทนใน order_numbers เช่น "tiktok: AAA","Shopee: BBB","FB: CCC","Facebook: DDD","LineOA: EEE","Lazada: FFF" และ unclear:false ในกรณีนี้ 7) ตรวจสอบความยาวเลขออเดอร์: Shopee ต้องมี 14 ตัวพอดี, Tiktok ต้องมี 18-19 หลักพอดี, Lazada ต้องมี 16 หลักพอดี — ถ้าอ่านได้แต่จำนวนตัวไม่ตรงให้ใช้ format platform:ชื่อลูกค้า แทน อย่าเดาตัวที่ขาด' });
+    content.push({ type: 'text', text: exampleText + 'ส่งภาพ 2 เวอร์ชั่น ต้นฉบับและหมุน 270 องศา ให้เลือกเวอร์ชั่นที่อ่านเลขออเดอร์ได้ชัดที่สุด เลขออเดอร์อยู่บรรทัดที่ 3 ถัดจากวันที่และชื่อ platform+ลูกค้า รูปแบบเช่น 260417ZXA1VJVQ (Shopee ขึ้นต้นด้วย 26 ยาว 14 ตัว) หรือ 583866734348764827 (Tiktok เป็นตัวเลขล้วนยาว 18-19 หลักถัดจากชื่อลูกค้า) หรือ (Lazada เป็นตัวเลขยาว 16 หลัก เช่น 1082651067631474) ตอบเป็น JSON เท่านั้น {"order_numbers":["เลข1"],"unclear":false,"use_customer_name":false} กฎ: 1) ไม่ใช่วันที่ 2) ไม่ใช่ชื่อลูกค้า 3) ถ้ามีสิ่งปิดทับบนตัวเลขออเดอร์โดยตรงจนอ่านไม่ออกให้ unclear:true แต่ถ้าเทปหรือสติ๊กเกอร์อยู่คนละบรรทัดกับเลขออเดอร์ให้อ่านได้ปกติ 4) ถ้าไม่มั่นใจให้ unclear:true 5) ห้ามเดา 6) ถ้าเลขออเดอร์โดนปิดหรือไม่มีเลยให้ใส่ platform_ชื่อลูกค้า แทนใน order_numbers เช่น "tiktok: AAA","Shopee: BBB","FB: CCC","Facebook: DDD","LineOA: EEE","Lazada: FFF" และ unclear:false ในกรณีนี้ 7) ตรวจสอบความยาวเลขออเดอร์: Shopee ต้องมี 14 ตัวพอดี, Tiktok ต้องมี 18-19 หลักพอดี, Lazada ต้องมี 16 หลักพอดี — ถ้าอ่านได้แต่จำนวนตัวไม่ตรงให้ใช้ format platform:ชื่อลูกค้า แทน อย่าเดาตัวที่ขาด' + (isTest ? ' สำคัญมาก: ถ้าหาเลขออเดอร์ที่ตรงรูปแบบ (Shopee 14, Tiktok 18-19, Lazada 16) ไม่ได้ ไม่ว่าจะเพราะอ่านไม่ชัด โดนปิด หรือใบนี้ไม่มีเลขออเดอร์ แต่ยังเห็นชื่อ platform และชื่อลูกค้า ให้ตอบ order_numbers เป็น ["platform: ชื่อลูกค้า"] และ unclear:false เสมอ ห้ามตอบ unclear:true หรือส่ง order_numbers ว่าง ตราบใดที่ยังเห็นชื่อลูกค้าในใบ' : '') });
 
     let response;
     for (let attempt = 1; attempt <= 3; attempt++) {
@@ -363,7 +364,6 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
       [process.env.GROUP_IRON]: 'กำลังรีด',
       [process.env.GROUP_PACK]: 'กำลังแพ็ค'
     };
-    const isTest = groupId === GROUP_TEST;
     const status = statusMap[groupId];
 
     const reads = [];
