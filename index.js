@@ -383,16 +383,19 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
         ? supabase.from('work_status').select('id').eq('order_name', orderName).limit(1)
         : supabase.from('work_status').select('id').eq('order_number', orderNumber).limit(1);
 
-      const { data: existing } = await query;
+      const { data: existing, error: selectError } = await query;
+      if (selectError) console.error('work_status select error:', selectError.message, { orderNumber, orderName });
 
       if (existing && existing.length > 0) {
         const updateQuery = isNameBased
           ? supabase.from('work_status').update({ status, status_updated_at: new Date().toISOString() }).eq('order_name', orderName)
           : supabase.from('work_status').update({ status, status_updated_at: new Date().toISOString() }).eq('order_number', orderNumber);
-        await updateQuery;
+        const { error: updateError } = await updateQuery;
+        if (updateError) console.error('work_status update error:', updateError.message, { orderNumber, orderName, status });
       } else {
-        await supabase.from('work_status')
+        const { error: insertError } = await supabase.from('work_status')
           .insert([{ order_number: orderNumber, order_name: orderName, status }]);
+        if (insertError) console.error('work_status insert error:', insertError.message, { orderNumber, orderName, status });
       }
     }
 
