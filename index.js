@@ -23,6 +23,9 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const lastImagePerGroup = {};
 
+// กลุ่มทดสอบ — อ่านภาพ/ประมวลผลอย่างเดียว ไม่บันทึกลง Supabase
+const GROUP_TEST = 'C635c26c6a6e12578e79fbfb547fe3501';
+
 // Webhook route
 app.post('/webhook',
   line.middleware(lineConfig),
@@ -96,7 +99,7 @@ async function handleEvent(event) {
   }
 
   // กลุ่มช่าง 4 กลุ่ม — อ่านภาพดูเลขออเดอร์
-  if ([GROUP_CUT, GROUP_SEW, GROUP_IRON, GROUP_PACK].includes(groupId)) {
+  if ([GROUP_CUT, GROUP_SEW, GROUP_IRON, GROUP_PACK, GROUP_TEST].includes(groupId)) {
     if (message.type === 'image') {
       await handleWorkImage(replyToken, message.id, groupId);
       return;
@@ -360,12 +363,18 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
       [process.env.GROUP_IRON]: 'กำลังรีด',
       [process.env.GROUP_PACK]: 'กำลังแพ็ค'
     };
+    const isTest = groupId === GROUP_TEST;
     const status = statusMap[groupId];
 
+    const reads = [];
     for (const orderNum of data.order_numbers) {
       const isNameBased = orderNum.includes(':');
       const orderName = isNameBased ? orderNum.split(':')[1].trim() : null;
       const orderNumber = isNameBased ? null : orderNum;
+
+      reads.push(orderNum + ' → ' + (isNameBased ? 'อ่านเป็นชื่อลูกค้า (platform:ชื่อ)' : 'อ่านเป็นเลขออเดอร์'));
+
+      if (isTest) continue;
 
       const query = isNameBased
         ? supabase.from('work_status').select('id').eq('order_name', orderName).limit(1)
@@ -386,12 +395,21 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
 
     lastImagePerGroup[groupId] = {
       order_numbers: data.order_numbers,
-      status: status
+      status: isTest ? 'test' : status
     };
 
-    const orderList = data.order_numbers.join('\n');
     const bangkokTime = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
     const dateStr = bangkokTime.getDate() + '/' + (bangkokTime.getMonth() + 1) + '/' + bangkokTime.getFullYear();
+
+    if (isTest) {
+      await client.replyMessage({
+        replyToken,
+        messages: [{ type: 'text', text: '🧪 ทดสอบการอ่าน (ไม่บันทึกลงระบบ)\nวันที่: ' + dateStr + '\nออเดอร์:\n' + reads.join('\n') + '\nสถานะ: ประมวลผลอย่างเดียว ไม่บันทึกลง Supabase เพราะเป็นกลุ่มทดสอบ' }]
+      });
+      return;
+    }
+
+    const orderList = data.order_numbers.join('\n');
     await client.replyMessage({
       replyToken,
       messages: [{ type: 'text', text: '✅ บันทึกแล้วค่ะ\nวันที่: ' + dateStr + '\nออเดอร์:\n' + orderList + '\nสถานะ: ' + status }]
