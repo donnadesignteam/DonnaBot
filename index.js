@@ -1028,7 +1028,25 @@ async function handleDirectChat(replyToken, userId, userText) {
         updated_at: new Date().toISOString()
       });
       console.log('upsert pending_intent error:', upsertError?.message);
-      const msg = 'ขอข้อมูลเพิ่มเติมด้วยนะคะ\n' + missing.map((m, i) => `${i + 1}. ${m}`).join('\n');
+      let msg;
+      try {
+        const askRes = await anthropic.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 400,
+          system: 'คุณคือพนักงานร้านผ้าม่านที่กำลังแชตกับลูกค้าเพื่อประเมินราคา ตอบภาษาไทยเป็นกันเองสุภาพ ใช้หางเสียง "ค่ะ" ห้าม markdown ห้ามขึ้นต้นด้วยเลขข้อแบบฟอร์ม ให้ถามข้อมูลที่ยังขาดอย่างเป็นธรรมชาติเหมือนคนคุยจริง รวบเป็นข้อความเดียวลื่นๆ ถ้าข้อมูลที่ขาดมีตัวเลือกหรือรุ่นให้ลิสต์มาให้ลูกค้าเลือกครบทุกตัว',
+          messages: [{ role: 'user', content:
+            (recentHistory ? 'ประวัติแชต:\n' + recentHistory + '\n\n' : '') +
+            'ลูกค้าพิมพ์ล่าสุด: ' + userText + '\n\n' +
+            'ข้อมูลที่ได้แล้ว: ' + JSON.stringify(intent) + '\n\n' +
+            'ข้อมูลที่ยังต้องถามเพิ่ม:\n' + missing.map(m => '- ' + m).join('\n') + '\n\n' +
+            'ช่วยถามลูกค้าเพื่อขอข้อมูลที่ยังขาดอย่างเป็นธรรมชาติในข้อความเดียว'
+          }]
+        });
+        msg = (askRes.content[0].text || '').trim();
+      } catch (e) {
+        console.log('natural ask error:', e?.message);
+      }
+      if (!msg) msg = 'ขอข้อมูลเพิ่มเติมด้วยนะคะ\n' + missing.map((m, i) => `${i + 1}. ${m}`).join('\n');
       await supabase.from('chat_history').insert({ user_id: userId, role: 'user', content: userText });
       await supabase.from('chat_history').insert({ user_id: userId, role: 'assistant', content: msg });
       return await replyText(replyToken, msg);
