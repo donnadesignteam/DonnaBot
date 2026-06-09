@@ -358,6 +358,23 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
   return;
 }
 
+    // ตรวจงานเคลมแยกต่างหาก (ยิงถาม Claude คำถามเดียวสั้นๆ) — เชื่อถือได้กว่าฝังใน prompt อ่านเลขออเดอร์
+    let isClaim = false;
+    try {
+      const claimCheck = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 10,
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
+          { type: 'text', text: 'ในรูปใบงานนี้ มีคำภาษาไทยว่า "เคลม" ปรากฏอยู่ไหม (เช่น "Shopee เคลม", "เคลม:", "งานเคลม", "เคลมส่งด่วน") ตอบแค่ yes หรือ no เท่านั้น' }
+        ] }]
+      });
+      isClaim = /yes/i.test(claimCheck.content[0].text || '');
+    } catch (e) {
+      console.error('claim check error:', e.message);
+    }
+    console.log('isClaim:', isClaim);
+
     const statusMap = {
       [process.env.GROUP_CUT]: 'กำลังตัด',
       [process.env.GROUP_SEW]: 'กำลังเย็บ',
@@ -379,7 +396,7 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
 
       // โหมดทดสอบ (GROUP_TEST): งานเคลม = เขียนลงตาราง claims จริง (ตั้งสถานะ "เช็คของ" ให้เห็นการเปลี่ยน), งานปกติ = ไม่บันทึก
       if (isTest) {
-        if (data.is_claim) {
+        if (isClaim) {
           const claimMatch = isNameBased
             ? supabase.from('claims').select('id, status').eq('customer_username', orderName).order('created_at', { ascending: false }).limit(1)
             : supabase.from('claims').select('id, status').eq('original_order_number', orderNumber).order('created_at', { ascending: false }).limit(1);
