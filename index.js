@@ -358,18 +358,20 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
   return;
 }
 
-    // ตรวจงานเคลมแยกต่างหาก (ยิงถาม Claude คำถามเดียวสั้นๆ) — เชื่อถือได้กว่าฝังใน prompt อ่านเลขออเดอร์
+    // ตรวจงานเคลม: ให้โมเดลอ่านบรรทัดบนสุด (บรรทัด platform) ออกมาตรงๆ แล้วเช็คในโค้ดว่ามีคำว่า "เคลม"
     let isClaim = false;
     try {
       const claimCheck = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 10,
+        max_tokens: 80,
         messages: [{ role: 'user', content: [
           { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
-          { type: 'text', text: 'ในรูปใบงานนี้ มีคำภาษาไทยว่า "เคลม" ปรากฏอยู่ไหม (เช่น "Shopee เคลม", "เคลม:", "งานเคลม", "เคลมส่งด่วน") ตอบแค่ yes หรือ no เท่านั้น' }
+          { type: 'text', text: 'อ่านบรรทัดบนสุดของใบที่มีชื่อแพลตฟอร์ม (Shopee/Tiktok/Lazada/Facebook/Line) ออกมาให้ตรงเป๊ะทุกตัวอักษรรวมคำว่า เคลม ถ้ามี ตอบเฉพาะข้อความบรรทัดนั้นบรรทัดเดียว' }
         ] }]
       });
-      isClaim = /yes/i.test(claimCheck.content[0].text || '');
+      const headerLine = (claimCheck.content[0].text || '').trim();
+      console.log('claim header line:', headerLine);
+      isClaim = /เคลม/.test(headerLine);
     } catch (e) {
       console.error('claim check error:', e.message);
     }
