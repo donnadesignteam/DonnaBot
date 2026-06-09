@@ -377,18 +377,27 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
 
       reads.push(orderNum + ' → คอลัมน์ ' + (isNameBased ? ('order_name = ' + orderName) : ('order_number = ' + orderNumber)));
 
-      // โหมดทดสอบ (GROUP_TEST): ตรวจงานเคลม + ลองหาเคสในระบบ — อ่านอย่างเดียว ไม่เขียน
+      // โหมดทดสอบ (GROUP_TEST): งานเคลม = เขียนลงตาราง claims จริง (ตั้งสถานะ "เช็คของ" ให้เห็นการเปลี่ยน), งานปกติ = ไม่บันทึก
       if (isTest) {
         if (data.is_claim) {
           const claimMatch = isNameBased
             ? supabase.from('claims').select('id, status').eq('customer_username', orderName).order('created_at', { ascending: false }).limit(1)
             : supabase.from('claims').select('id, status').eq('original_order_number', orderNumber).order('created_at', { ascending: false }).limit(1);
-          const { data: claimRows } = await claimMatch;
-          reads[reads.length - 1] += (claimRows && claimRows.length > 0)
-            ? '  🛠️ งานเคลม → เจอเคสในระบบ (สถานะตอนนี้: ' + claimRows[0].status + ') ของจริงจะอัปเดตตามกลุ่มช่าง'
-            : '  🛠️ งานเคลม → ยังไม่เจอเคสในตาราง claims (ต้องลงเคสในเว็บก่อน)';
+          const { data: claimRows, error: claimSelErr } = await claimMatch;
+          if (claimSelErr) console.error('claims select error:', claimSelErr.message, { orderNumber, orderName });
+          if (claimRows && claimRows.length > 0) {
+            const testStatus = 'เช็คของ';
+            const { error: claimUpdErr } = await supabase.from('claims')
+              .update({ status: testStatus, updated_at: new Date().toISOString() })
+              .eq('id', claimRows[0].id);
+            reads[reads.length - 1] += claimUpdErr
+              ? '  🛠️ งานเคลม → พบเคส แต่บันทึกไม่สำเร็จ: ' + claimUpdErr.message
+              : '  🛠️ งานเคลม → บันทึกแล้ว ✅ สถานะ "' + claimRows[0].status + '" → "' + testStatus + '"';
+          } else {
+            reads[reads.length - 1] += '  🛠️ งานเคลม → ยังไม่เจอเคสในตาราง claims (ต้องลงเคสในเว็บก่อน)';
+          }
         } else {
-          reads[reads.length - 1] += '  (งานปกติ)';
+          reads[reads.length - 1] += '  (งานปกติ ไม่บันทึก)';
         }
         continue;
       }
@@ -425,7 +434,7 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
     if (isTest) {
       await client.replyMessage({
         replyToken,
-        messages: [{ type: 'text', text: '🧪 ทดสอบการอ่าน (ไม่บันทึกลงระบบ)\nวันที่: ' + dateStr + '\nออเดอร์:\n' + reads.join('\n') }]
+        messages: [{ type: 'text', text: '🧪 ทดสอบ (งานเคลม → อัปเดต claims จริง / งานปกติ → ไม่บันทึก)\nวันที่: ' + dateStr + '\nออเดอร์:\n' + reads.join('\n') }]
       });
       return;
     }
