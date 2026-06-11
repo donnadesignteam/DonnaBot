@@ -358,22 +358,26 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
   return;
 }
 
-    // ตรวจงานเคลม: ให้โมเดลอ่านบรรทัดบนสุด (บรรทัด platform) ออกมาตรงๆ แล้วเช็คในโค้ดว่ามีคำว่า "เคลม"
+    // ตรวจงานเคลม 2 ชั้น: call หลักคัดกรองด้วย is_claim ก่อน ถ้าเจอจึงยิง call ที่สองยืนยัน
+    // (เคลมมี ~2% ของงาน — call ยืนยันจึงแทบไม่เพิ่มค่าใช้จ่าย เทียบกับยิงทุกรูปแบบเดิม)
     let isClaim = false;
-    try {
-      const claimCheck = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 80,
-        messages: [{ role: 'user', content: [
-          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
-          { type: 'text', text: 'อ่านบรรทัดบนสุดของใบที่มีชื่อแพลตฟอร์ม (Shopee/Tiktok/Lazada/Facebook/Line) ออกมาให้ตรงเป๊ะทุกตัวอักษรรวมคำว่า เคลม ถ้ามี ตอบเฉพาะข้อความบรรทัดนั้นบรรทัดเดียว' }
-        ] }]
-      });
-      const headerLine = (claimCheck.content[0].text || '').trim();
-      console.log('claim header line:', headerLine);
-      isClaim = /เคลม/.test(headerLine);
-    } catch (e) {
-      console.error('claim check error:', e.message);
+    if (data.is_claim) {
+      try {
+        const claimCheck = await anthropic.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 80,
+          messages: [{ role: 'user', content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
+            { type: 'text', text: 'อ่านบรรทัดบนสุดของใบที่มีชื่อแพลตฟอร์ม (Shopee/Tiktok/Lazada/Facebook/Line) ออกมาให้ตรงเป๊ะทุกตัวอักษรรวมคำว่า เคลม ถ้ามี ตอบเฉพาะข้อความบรรทัดนั้นบรรทัดเดียว' }
+          ] }]
+        });
+        const headerLine = (claimCheck.content[0].text || '').trim();
+        console.log('claim header line:', headerLine);
+        isClaim = /เคลม/.test(headerLine);
+      } catch (e) {
+        console.error('claim check error:', e.message);
+        isClaim = true; // ยืนยันไม่สำเร็จ ให้ถือตามผล call หลักไปก่อน (ไม่ปล่อยเคลมหลุด)
+      }
     }
     console.log('isClaim:', isClaim);
 
