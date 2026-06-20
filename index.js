@@ -382,10 +382,10 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
     console.log('isClaim:', isClaim);
 
     const statusMap = {
-      [process.env.GROUP_CUT]: 'กำลังตัด',
-      [process.env.GROUP_SEW]: 'กำลังเย็บ',
-      [process.env.GROUP_IRON]: 'กำลังรีด',
-      [process.env.GROUP_PACK]: 'กำลังแพ็ค'
+      [process.env.GROUP_CUT]: 'ตัดผ้าแล้ว',
+      [process.env.GROUP_SEW]: 'เย็บแล้ว',
+      [process.env.GROUP_IRON]: 'รีดแล้ว',
+      [process.env.GROUP_PACK]: 'แพ็คแล้ว'
     };
     const status = statusMap[groupId];
 
@@ -426,6 +426,16 @@ if ((data.unclear && !hasCustomerName) || data.order_numbers.length === 0) {
       }
 
       // กลุ่มจริง: พฤติกรรมเดิม (ยังไม่ route งานเคลม — รอยืนยันจากกลุ่มทดสอบก่อน)
+
+      // guard: ออเดอร์ที่ติ๊กงานเสร็จแล้ว (is_urgent) ไม่อัปเดตสถานะทับ — กันเด้งกลับจาก "รอจัดส่ง/รอติดตั้ง"
+      const { data: doneRows } = isNameBased
+        ? await supabase.from('order_entries').select('is_urgent').eq('customer_name', orderName).limit(1)
+        : await supabase.from('order_entries').select('is_urgent').eq('order_number', orderNumber).limit(1);
+      if (doneRows && doneRows[0] && doneRows[0].is_urgent) {
+        reads[reads.length - 1] += '  ⏭️ ข้าม (ติ๊กงานเสร็จแล้ว — ไม่ทับสถานะ)';
+        continue;
+      }
+
       const query = isNameBased
         ? supabase.from('work_status').select('id').eq('order_name', orderName).limit(1)
         : supabase.from('work_status').select('id').eq('order_number', orderNumber).limit(1);
@@ -565,15 +575,15 @@ const today = bangkokTime.getDate() + '/' + (bangkokTime.getMonth() + 1) + '/' +
 const { data: orders, error: ordersError } = await supabase
   .from('work_status')
   .select('order_number, status')
-  .in('status', ['กำลังตัด', 'กำลังเย็บ', 'กำลังรีด', 'กำลังแพ็ค'])
+  .in('status', ['ตัดผ้าแล้ว', 'เย็บแล้ว', 'รีดแล้ว', 'แพ็คแล้ว'])
   .gte('status_updated_at', todayStr);
 console.log('cron orders:', orders?.length, 'error:', ordersError?.message, 'todayStr:', todayStr);
 
-    const cut = orders.filter(o => o.status === 'กำลังตัด').map(o => o.order_number).join('\n') || '-';
-    const sew = orders.filter(o => o.status === 'กำลังเย็บ').map(o => o.order_number).join('\n') || '-';
-    const iron = orders.filter(o => o.status === 'กำลังรีด').map(o => o.order_number).join('\n') || '-';
+    const cut = orders.filter(o => o.status === 'ตัดผ้าแล้ว').map(o => o.order_number).join('\n') || '-';
+    const sew = orders.filter(o => o.status === 'เย็บแล้ว').map(o => o.order_number).join('\n') || '-';
+    const iron = orders.filter(o => o.status === 'รีดแล้ว').map(o => o.order_number).join('\n') || '-';
 
-    const pack = (orders || []).filter(o => o.status === 'กำลังแพ็ค').map(o => o.order_number).join('\n') || '-';
+    const pack = (orders || []).filter(o => o.status === 'แพ็คแล้ว').map(o => o.order_number).join('\n') || '-';
 
     const msg = 'สรุปออเดอร์วันที่ ' + today + '\n\nออเดอร์ถึงช่างตัด\n' + cut + '\n\nออเดอร์ถึงงานเย็บ\n' + sew + '\n\nออเดอร์ถึงช่างรีด\n' + iron + '\n\nออเดอร์ถึงแพ็ค\n' + pack;
 
