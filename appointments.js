@@ -103,7 +103,11 @@ function card(title, rows, buttons, color = '#8B5E3C') {
   };
 }
 
-const whenText = (date, time) => date ? `${thaiDayLabel(date)}${time ? ' เวลา ' + time + ' น.' : ' (ยังไม่มีเวลา)'}` : '❗ยังไม่มีวัน';
+// ใช้ในการ์ด/คำตอบยืนยัน · วันอาทิตย์เตือนไว้ (ปฏิทินในเว็บถือว่าร้านปิดวันอาทิตย์)
+const isSunday = (date) => { const [y, m, d] = date.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)).getUTCDay() === 0; };
+const whenText = (date, time) => date
+  ? `${thaiDayLabel(date)}${time ? ' เวลา ' + time + ' น.' : ' (ยังไม่มีเวลา)'}${isSunday(date) ? ' ⚠️ วันอาทิตย์ร้านปิด' : ''}`
+  : '❗ยังไม่มีวัน';
 
 // ── #นัด ──
 async function handleNew(ctx, replyToken, text) {
