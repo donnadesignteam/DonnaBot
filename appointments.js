@@ -191,7 +191,7 @@ async function handleSummary(ctx, replyToken, text) {
     const rows = (up || []).filter(r => !DONE.includes(r.installation_status) && zoneOf(r) === z);
     const pend = (wait || []).filter(r => !DONE.includes(r.installation_status) && zoneOf(r) === z);
     if (!rows.length && !pend.length) continue;
-    let s = `🔥อัพเดตงานติดตั้ง+วัดหน้างาน🔥\n${z ? '#' + z : '❓ยังไม่ระบุโซนในเว็บ (ไปใส่โซนในปฏิทินงานติดตั้งด้วย)'}\n(ดึงจากเว็บ · ${bkkToday().split('-').reverse().join('/')})\n`;
+    let s = `${z ? '#' + z : '❓ยังไม่ระบุโซนในเว็บ (ไปใส่โซนในปฏิทินงานติดตั้งด้วย)'}\n`;
     let lastDate = '';
     for (const r of rows) {
       const { date, time } = toBkk(r.appointment_datetime);
@@ -211,10 +211,20 @@ async function handleSummary(ctx, replyToken, text) {
     parts.push(s.trim());
   }
   if (!parts.length) return reply(client, replyToken, `ไม่มีงานที่ยังไม่เสร็จ${zone ? 'ในโซน' + zone : ''}ในปฏิทินงานติดตั้ง`);
-  // ข้อความ LINE ยาวได้ ~5,000 ตัว และตอบได้ทีละไม่เกิน 5 ข้อความ
+  // รวมทุกโซนเป็นข้อความเดียว (เดิมแยกโซนละก้อน user บอกว่าขึ้นหลายก้อน) — แยกก้อนใหม่เฉพาะตอนยาวเกินที่ LINE รับได้
+  // ข้อความ LINE ยาวได้ 5,000 ตัว และตอบได้ทีละไม่เกิน 5 ข้อความ · ตัดตรงรอยต่อโซน/บรรทัด ไม่ตัดกลางงาน
+  const head = `🔥อัพเดตงานติดตั้ง+วัดหน้างาน🔥\n(ดึงจากเว็บ · ${bkkToday().split('-').reverse().join('/')})`;
+  const SEP = '\n\n══════════\n';
   const msgs = [];
-  for (const p of parts) for (let i = 0; i < p.length; i += 4800) msgs.push({ type: 'text', text: p.slice(i, i + 4800) });
-  await client.replyMessage({ replyToken, messages: msgs.slice(0, 5) });
+  let cur = head;
+  for (const p of parts) {
+    for (const line of (SEP + p).split(/(?=\n)/)) {
+      if (cur.length + line.length > 4900) { msgs.push(cur); cur = line.replace(/^\n+/, ''); }
+      else cur += line;
+    }
+  }
+  msgs.push(cur);
+  await client.replyMessage({ replyToken, messages: msgs.slice(0, 5).map(text => ({ type: 'text', text })) });
 }
 
 // ── ปุ่มในการ์ด ──
