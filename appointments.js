@@ -5,6 +5,7 @@
 //   · #สรุป / การหางานของ #เลื่อน = อ่านตาราง installations จริง (อ่านอย่างเดียว)
 // ตอบด้วย reply ทั้งหมด (ฟรี ไม่กินโควตาข้อความ LINE)
 
+const { calendarMessage } = require('./calendar');
 const DRY_RUN = true;   // ‼️ เปลี่ยนเป็น false เมื่อพร้อมให้บันทึกลงเว็บจริง (ยังไม่ได้เขียนส่วนบันทึก)
 
 const ZONES = ['กทม', 'เชียงราย', 'เชียงใหม่'];
@@ -253,7 +254,36 @@ async function handleSummary(ctx, replyToken, text) {
     }
   }
   msgs.push(cur);
-  await client.replyMessage({ replyToken, messages: msgs.slice(0, 5).map(text => ({ type: 'text', text })) });
+  // แนบรูปปฏิทินเดือนนี้ท้ายข้อความ (วาดไม่ได้ก็ส่งแค่ข้อความ ไม่ให้ทั้งคำสั่งพัง)
+  const out = msgs.slice(0, 4).map(text => ({ type: 'text', text }));
+  const img = await monthImage(ctx, zone, 0).catch(err => { console.error('calendar image error:', err); return null; });
+  if (img) out.push(img);
+  await client.replyMessage({ replyToken, messages: out });
+}
+
+// รูปปฏิทินของเดือน (offset 0 = เดือนนี้, 1 = เดือนหน้า) ตามโซนที่พิมพ์ / โซนของกลุ่ม
+async function monthImage(ctx, zone, offset) {
+  const { supabase, profile } = ctx;
+  const [y, m] = bkkToday().split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + offset, 1));
+  const zones = zone ? [zone] : profile ? profile.zones : null;
+  const title = zone ? '#' + zone : profile ? profile.label : 'ทุกโซน';
+  return calendarMessage({ supabase, year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, zones, title, zoneOf, today: bkkToday() });
+}
+
+// ── #ปฏิทิน [โซน] [เดือนหน้า | ชื่อเดือน/เลขเดือน] ── ส่งรูปอย่างเดียว
+async function handleCalendar(ctx, replyToken, text) {
+  const zone = ZONES.find(z => text.includes(z)) || '';
+  const [, m] = bkkToday().split('-').map(Number);
+  let offset = /เดือนหน้า|ถัดไป/.test(text) ? 1 : 0;
+  const TH = ['ม.ค', 'ก.พ', 'มี.ค', 'เม.ย', 'พ.ค', 'มิ.ย', 'ก.ค', 'ส.ค', 'ก.ย', 'ต.ค', 'พ.ย', 'ธ.ค'];
+  const FULL = ['มกรา', 'กุมภา', 'มีนา', 'เมษา', 'พฤษภา', 'มิถุนา', 'กรกฎา', 'สิงหา', 'กันยา', 'ตุลา', 'พฤศจิกา', 'ธันวา'];
+  let want = FULL.findIndex(f => text.includes(f)); if (want < 0) want = TH.findIndex(t => text.includes(t));
+  const num = (text.match(/(?:^|\s)(1[0-2]|[1-9])(?:\s|$)/) || [])[1];
+  if (want < 0 && num) want = Number(num) - 1;
+  if (want >= 0) { offset = (want - (m - 1) + 12) % 12; if (offset > 6) offset -= 12; }   // ย้อนได้ 5 เดือน ล่วงหน้าได้ 6 เดือน
+  const img = await monthImage(ctx, zone, offset);
+  await ctx.client.replyMessage({ replyToken, messages: [img] });
 }
 
 // ── ปุ่มในการ์ด ──
@@ -295,11 +325,12 @@ async function reply(client, replyToken, text) {
 // ข้อความขึ้นต้นด้วยคำสั่งไหม → จัดการแล้วคืน true
 async function handleApptText(ctx, replyToken, text, profileKey) {
   ctx = { ...ctx, profile: PROFILES[profileKey] || null };
-  const m = text.match(/^#\s*(นัด|เลื่อน|สรุป)\s*([\s\S]*)$/);
+  const m = text.match(/^#\s*(นัด|เลื่อน|สรุป|ปฏิทิน)\s*([\s\S]*)$/);
   if (!m) return false;
   try {
     if (m[1] === 'นัด') await handleNew(ctx, replyToken, m[2].trim());
     else if (m[1] === 'เลื่อน') await handleMove(ctx, replyToken, m[2].trim());
+    else if (m[1] === 'ปฏิทิน') await handleCalendar(ctx, replyToken, m[2].trim());
     else await handleSummary(ctx, replyToken, m[2].trim());
   } catch (err) {
     console.error('appt error:', err);

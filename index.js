@@ -28,6 +28,9 @@ const { handleApptText, handleApptPostback } = require('./appointments');
 // กลุ่มทดสอบ — อ่านภาพ/ประมวลผลอย่างเดียว ไม่บันทึกลง Supabase
 const GROUP_TEST = 'C635c26c6a6e12578e79fbfb547fe3501';
 
+// รูปปฏิทินงานติดตั้งที่บอทวาด (#สรุป / #ปฏิทิน) — LINE ดึงรูปจากลิงก์นี้
+require('./calendar').registerCalendarRoute(app);
+
 // Webhook route
 app.post('/webhook',
   line.middleware(lineConfig),
