@@ -22,6 +22,8 @@ const client = new line.messagingApi.MessagingApiClient({
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const lastImagePerGroup = {};
+// ลงนัดติดตั้งผ่านแชท (#นัด / #เลื่อน / #สรุป) — ระยะทดสอบ: แชทส่วนตัวเท่านั้น ไม่เขียนลงเว็บ
+const { handleApptText, handleApptPostback } = require('./appointments');
 
 // กลุ่มทดสอบ — อ่านภาพ/ประมวลผลอย่างเดียว ไม่บันทึกลง Supabase
 const GROUP_TEST = 'C635c26c6a6e12578e79fbfb547fe3501';
@@ -41,6 +43,11 @@ app.post('/webhook',
 // เหลือ 3 อย่าง: กลุ่มช่าง (อ่านรูปเดินสถานะ) · กลุ่มแอดมิน (@บอท) · แชทส่วนตัว
 // ปิดไปแล้วตามที่ร้านสั่ง (5 ส.ค. 69): กลุ่มออเดอร์ · กลุ่มสั่งของซัพพลายเออร์ · แจ้งเตือนอัตโนมัติ 8:00/19:00
 async function handleEvent(event) {
+  // ปุ่มในการ์ดนัด (#นัด / #เลื่อน)
+  if (event.type === 'postback') {
+    await handleApptPostback({ client, anthropic, supabase }, event.replyToken, event.postback?.data || '');
+    return;
+  }
   if (event.type !== 'message') return;
   const { replyToken, message } = event;
   const groupId = event.source.groupId;
@@ -63,6 +70,7 @@ async function handleEvent(event) {
 
   if (!groupId && event.source.type === 'user') {
     if (message.type === 'text') {
+      if (await handleApptText({ client, anthropic, supabase }, replyToken, message.text.trim())) return;
       await handleDirectChat(replyToken, event.source.userId, message.text.trim());
     }
     return;
