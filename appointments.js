@@ -1,5 +1,5 @@
 // ── ลงนัดติดตั้ง/วัดหน้างานผ่านแชท LINE ─────────────────────────────
-// คำสั่ง: #นัด <ข้อความนัดแบบที่ทีมโพสต์ในกลุ่ม> · #เลื่อน <ลูกค้า> เป็น <วัน เวลา> · #สรุป [กทม|เชียงราย|เชียงใหม่]
+// คำสั่ง: #นัด <ข้อความนัดแบบที่ทีมโพสต์ในกลุ่ม> · #แก้ <ลูกค้า> <วันเวลาใหม่/ช่องที่แก้> (#เลื่อน ใช้แทนกันได้) · #สรุป [โซน] · #ปฏิทิน [โซน] [เดือน]
 // ระยะทดสอบ (8 ต.ค. 69): ใช้ในแชทส่วนตัวกับบอทเท่านั้น และ **ไม่เขียนตาราง installations**
 //   · #นัด / #เลื่อน → AI อ่านข้อความ → การ์ดยืนยัน → กด ✅ แค่ตอบว่า "ถ้าใช้จริงจะบันทึกอะไร"
 //   · #สรุป / การหางานของ #เลื่อน = อ่านตาราง installations จริง (อ่านอย่างเดียว)
@@ -77,9 +77,20 @@ const NEW_SYSTEM = () => `คุณอ่านข้อความนัดง
 กติกา: วัดหน้างาน/วัดขนาด = งานวัดหน้างาน · แก้งาน/รีเช็ค/ซ่อม = งานแก้ · นอกนั้น = งานติดตั้ง
 install_zone: กรุงเทพ/ปริมณฑล/นนทบุรี/สมุทรปราการ = กทม · เชียงราย = เชียงราย · เชียงใหม่ = เชียงใหม่ · จังหวัดอื่นในภาคเหนือ (ลำปาง พะเยา ฯลฯ) = เชียงราย · ไม่รู้ = ''`;
 
-const MOVE_SYSTEM = () => `คุณอ่านคำสั่งเลื่อนนัดงานติดตั้งของร้านผ้าม่าน แล้วตอบเป็น JSON อย่างเดียว
+// #แก้ (และ #เลื่อน แบบเดิม) — แก้ได้ทุกช่องในคำสั่งเดียว รวมวัน/เวลา (user สั่ง 8ต.ค.69 ไม่อยากพิมพ์ 2 คำสั่ง)
+const EDIT_SYSTEM = () => `คุณอ่านคำสั่งแก้ไขงานนัดติดตั้งของร้านผ้าม่าน แล้วตอบเป็น JSON อย่างเดียว ห้ามมีคำอื่น
 วันนี้คือ ${bkkToday()} (ปี พ.ศ. ให้ลบ 543 · ไม่ระบุปีให้ใช้วันที่ที่ใกล้วันนี้ที่สุดที่ยังไม่ผ่านไป)
-{"query":"คำที่ใช้หางาน เช่น ชื่อลูกค้า/ชื่อไลน์/เบอร์/เลข IN","new_date":"YYYY-MM-DD หรือ ''","new_time":"HH:MM หรือ ''","note":"เหตุผล/หมายเหตุถ้ามี"}`;
+{"query":"คำที่ใช้หางาน = ชื่อลูกค้า/ชื่อไลน์/เบอร์เดิม/เลข IN (ไม่ใช่ค่าใหม่)",
+ "changes":{ ใส่เฉพาะช่องที่สั่งให้เปลี่ยน:
+   "date":"YYYY-MM-DD","time":"HH:MM","work_type":"งานติดตั้ง"|"งานวัดหน้างาน"|"งานแก้",
+   "customer_real_name":"","phone":"ตัวเลขล้วน","province":"ที่อยู่/จังหวัด","location_link":"","install_zone":"กทม"|"เชียงราย"|"เชียงใหม่","notes":"" },
+ "notes_mode":"append" (เพิ่มต่อท้ายหมายเหตุเดิม = ค่าตั้งต้น) | "replace" (เมื่อสั่งชัดว่าเปลี่ยน/ลบหมายเหตุเดิม)}
+ตัวอย่าง: "#แก้ Yothaka เป็น 11/10 10.00 เบอร์ 0922836430" → query "Yothaka", changes {date, time, phone}
+"เลื่อนเป็นบ่ายโมง" = time 13:00 · "วัดหน้างาน" = work_type งานวัดหน้างาน`;
+
+// ช่องที่แก้ได้ → ชื่อไทยในการ์ด (เรียงตามลำดับที่โชว์)
+const EDIT_FIELDS = [['work_type', 'งาน'], ['customer_real_name', 'ชื่อจริง'], ['phone', 'เบอร์'], ['province', 'ที่อยู่'],
+  ['location_link', 'แผนที่'], ['install_zone', 'โซน'], ['notes', 'หมายเหตุ']];
 
 // ── การ์ดยืนยัน (Flex) ──
 function card(title, rows, buttons, color = '#8B5E3C') {
@@ -139,7 +150,7 @@ async function handleNew(ctx, replyToken, text) {
 async function findJobs(supabase, query, profile) {
   const since = new Date(Date.now() - 30 * 86400e3).toISOString();
   const { data, error } = await supabase.from('installations')
-    .select('id, serial_no, appointment_datetime, work_type, customer_id, customer_real_name, phone, province, install_zone, installation_status')
+    .select('id, serial_no, appointment_datetime, work_type, customer_id, customer_real_name, phone, province, location_link, notes, install_zone, installation_status')
     .or(`appointment_datetime.gte.${since},appointment_datetime.is.null`)
     .order('appointment_datetime', { ascending: true, nullsFirst: false })
     .limit(800);
@@ -168,30 +179,58 @@ const shortLabel = (r) => {
   return `${sn}${when} ${r.customer_id || r.customer_real_name || ''}`.slice(0, 40);
 };
 
-function moveCard(job, a, t) {
-  const { date, time } = toBkk(job.appointment_datetime);
-  return card('🔁 เลื่อนนัด (ทดสอบ)', [
-    ['งาน', jobLabel(job)], ['เดิม', date ? whenText(date, time) : 'ยังไม่มีวัน'],
-    ['ใหม่', whenText(a.new_date, a.new_time || time)], ['หมายเหตุ', a.note],
-  ], [['✅ ยืนยัน', `appt:ok:${t}`, 'primary'], ['✏️ แก้', `appt:edit:${t}`]], '#4F6D7A');
+// ค่าใหม่ของงานหลังแก้ (ยังไม่บันทึก) — วัน/เวลาที่ไม่ได้สั่งเปลี่ยนใช้ของเดิม · หมายเหตุต่อท้ายของเดิมเว้นแต่สั่งให้แทน
+function applyEdit(job, a) {
+  const c = a.changes || {};
+  const old = toBkk(job.appointment_datetime);
+  const after = { date: c.date || old.date, time: c.time || old.time };
+  for (const [f] of EDIT_FIELDS) {
+    if (c[f] == null || c[f] === '') continue;
+    if (String(c[f]).trim() === String(job[f] || '').trim()) continue;   // เหมือนของเดิม = ไม่ต้องแก้
+    after[f] = f === 'notes' && a.notes_mode !== 'replace' && job.notes ? `${job.notes}\n${c.notes}` : c[f];
+  }
+  return after;
 }
 
-// ── #เลื่อน ──
-async function handleMove(ctx, replyToken, text) {
+// มีอะไรเปลี่ยนจริงไหม (ค่าที่สั่งอาจเหมือนของเดิมทั้งหมด)
+function hasChange(job, a) {
+  const c = a.changes || {}, old = toBkk(job.appointment_datetime), after = applyEdit(job, a);
+  return (c.date && c.date !== old.date) || (c.time && c.time !== old.time) || EDIT_FIELDS.some(([f]) => after[f] !== undefined);
+}
+const sameReply = (job) => `ข้อมูลของ ${jobLabel(job)} ตรงกับที่พิมพ์อยู่แล้ว ไม่ต้องแก้อะไรค่ะ`;
+
+function editCard(job, a, t) {
+  const c = a.changes || {};
+  const old = toBkk(job.appointment_datetime);
+  const after = applyEdit(job, a);
+  const rows = [['ใบงาน', jobLabel(job)]];
+  if ((c.date && c.date !== old.date) || (c.time && c.time !== old.time)) rows.push(['วันนัด', `${old.date ? whenText(old.date, old.time) : 'ยังไม่มีวัน'}\n→ ${whenText(after.date, after.time)}`]);
+  for (const [f, label] of EDIT_FIELDS) {
+    if (after[f] === undefined) continue;
+    const was = String(job[f] || '-');
+    rows.push([label, f === 'notes' && a.notes_mode !== 'replace' && job.notes ? `เพิ่มต่อท้าย: ${c.notes}` : `${was.length > 60 ? was.slice(0, 60) + '…' : was}\n→ ${after[f]}`]);
+  }
+  return card('✏️ แก้ไขงาน (ทดสอบ)', rows, [['✅ ยืนยัน', `appt:ok:${t}`, 'primary'], ['✖️ ยกเลิก', `appt:edit:${t}`]], '#4F6D7A');
+}
+
+// ── #แก้ (และ #เลื่อน) ──
+async function handleEdit(ctx, replyToken, text) {
   const { client, anthropic, supabase, profile } = ctx;
-  if (!text) return reply(client, replyToken, 'พิมพ์ #เลื่อน ตามด้วยลูกค้าและวันใหม่ เช่น\n#เลื่อน Att เป็น 9/10 13.00\n(อ้างงานด้วยชื่อไลน์ ชื่อจริง เบอร์ หรือเลข IN ก็ได้)');
-  const a = await askJson(anthropic, MOVE_SYSTEM(), text);
-  if (!a || !a.query) return reply(client, replyToken, 'ไม่รู้ว่าจะเลื่อนงานของใคร ลองพิมพ์ชื่อลูกค้าหรือเบอร์ด้วยนะคะ');
-  if (!a.new_date && !a.new_time) return reply(client, replyToken, `เจองานของ "${a.query}" แต่ไม่รู้ว่าจะเลื่อนเป็นวันไหน ลองพิมพ์ใหม่พร้อมวัน/เวลาใหม่นะคะ`);
+  if (!text) return reply(client, replyToken, 'พิมพ์ #แก้ ตามด้วยลูกค้าและสิ่งที่จะแก้ เช่น\n#แก้ Yothaka เป็น 11/10 10.00\n#แก้ IN0131 เบอร์ 0922836430 หมายเหตุ เอาน้องอ๋องไปด้วย\n(อ้างงานด้วยชื่อไลน์ ชื่อจริง เบอร์ หรือเลข IN ก็ได้)');
+  const a = await askJson(anthropic, EDIT_SYSTEM(), text);
+  if (!a || !a.query) return reply(client, replyToken, 'ไม่รู้ว่าจะแก้งานของใคร ลองพิมพ์ชื่อลูกค้า เบอร์ หรือเลข IN ด้วยนะคะ');
+  a.changes = Object.fromEntries(Object.entries(a.changes || {}).filter(([, v]) => v != null && v !== ''));
+  if (!Object.keys(a.changes).length) return reply(client, replyToken, `เจอคำว่า "${a.query}" แต่ไม่รู้ว่าจะแก้อะไร ลองพิมพ์ใหม่ เช่น "#แก้ ${a.query} เป็น 15/10 13.00" หรือ "#แก้ ${a.query} เบอร์ 08xxxxxxxx"`);
   const jobs = await findJobs(supabase, a.query, profile);
   if (!jobs.length) return reply(client, replyToken, `ไม่เจองานที่ยังไม่เสร็จของ "${a.query}" ในปฏิทินงานติดตั้ง${profile ? ' (ค้นเฉพาะโซน ' + profile.zones.join('/') + ' + งานที่ยังไม่ระบุโซน)' : ''}\nลองค้นด้วยเบอร์ หรือเลข IN แทนได้ค่ะ`);
   if (jobs.length === 1) {
-    const t = keep({ kind: 'move', job: jobs[0], data: a });
-    return client.replyMessage({ replyToken, messages: [moveCard(jobs[0], a, t)] });
+    if (!hasChange(jobs[0], a)) return reply(client, replyToken, sameReply(jobs[0]));
+    const t = keep({ kind: 'edit', job: jobs[0], data: a });
+    return client.replyMessage({ replyToken, messages: [editCard(jobs[0], a, t)] });
   }
   // เจอหลายงาน → ให้เลือก (ปุ่มละงาน สูงสุด 4)
   const t = keep({ kind: 'pick', jobs: jobs.slice(0, 4), data: a });
-  const msg = card(`เจอ ${jobs.length} งาน — เลือกงานที่จะเลื่อน`, [['ค้นด้วย', a.query]], [], '#4F6D7A');
+  const msg = card(`เจอ ${jobs.length} งาน — เลือกงานที่จะแก้`, [['ค้นด้วย', a.query]], [], '#4F6D7A');
   msg.contents.footer = { type: 'box', layout: 'vertical', spacing: 'sm', contents: jobs.slice(0, 4).map((j, i) => ({
     type: 'button', style: 'secondary', height: 'sm',
     // ป้ายปุ่ม LINE ยาวได้ 40 ตัว → ใส่แค่เลข IN + วันเวลา + ชื่อ (ชื่อยาวโดนตัดท้ายแทนเวลา)
@@ -293,14 +332,15 @@ async function handlePostback(ctx, replyToken, data) {
     pending.delete(t);
     return reply(client, replyToken, p.kind === 'new'
       ? 'ยกเลิกการ์ดนี้แล้ว พิมพ์ #นัด ใหม่พร้อมข้อมูลที่ถูกต้องได้เลยค่ะ'
-      : 'ยกเลิกการ์ดนี้แล้ว พิมพ์ #เลื่อน ใหม่ได้เลยค่ะ');
+      : 'ยกเลิกการ์ดนี้แล้ว พิมพ์ #แก้ ใหม่ได้เลยค่ะ');
   }
   if (act === 'pick') {
     const job = p.jobs[Number(idx)];
-    if (!job) return reply(client, replyToken, 'ไม่เจองานที่เลือก ลองพิมพ์ #เลื่อน ใหม่นะคะ');
+    if (!job) return reply(client, replyToken, 'ไม่เจองานที่เลือก ลองพิมพ์ #แก้ ใหม่นะคะ');
     pending.delete(t);
-    const t2 = keep({ kind: 'move', job, data: p.data });
-    return client.replyMessage({ replyToken, messages: [moveCard(job, p.data, t2)] });
+    if (!hasChange(job, p.data)) return reply(client, replyToken, sameReply(job));
+    const t2 = keep({ kind: 'edit', job, data: p.data });
+    return client.replyMessage({ replyToken, messages: [editCard(job, p.data, t2)] });
   }
   if (act === 'ok') {
     pending.delete(t);
@@ -309,8 +349,12 @@ async function handlePostback(ctx, replyToken, data) {
         const a = p.data;
         return reply(client, replyToken, `🧪 ทดสอบ — ยังไม่บันทึกลงเว็บ\nถ้าใช้จริง จะเพิ่มในปฏิทินงานติดตั้ง:\n${a.work_type} · ${whenText(a.date, a.time)}\n${a.customer_id || a.customer_real_name || ''}${a.install_zone ? ' · โซน' + a.install_zone : ''}`);
       }
-      const { time } = toBkk(p.job.appointment_datetime);
-      return reply(client, replyToken, `🧪 ทดสอบ — ยังไม่แก้ในเว็บ\nถ้าใช้จริง จะเลื่อน ${jobLabel(p.job)}\nเป็น ${whenText(p.data.new_date || toBkk(p.job.appointment_datetime).date, p.data.new_time || time)}`);
+      const c = p.data.changes || {}, after = applyEdit(p.job, p.data);
+      const lines = [];
+      const old = toBkk(p.job.appointment_datetime);
+      if ((c.date && c.date !== old.date) || (c.time && c.time !== old.time)) lines.push(`วันนัด → ${whenText(after.date, after.time)}`);
+      for (const [f, label] of EDIT_FIELDS) if (after[f] !== undefined) lines.push(`${label} → ${f === 'notes' && p.data.notes_mode !== 'replace' && p.job.notes ? '(ต่อท้าย) ' + c.notes : after[f]}`);
+      return reply(client, replyToken, `🧪 ทดสอบ — ยังไม่แก้ในเว็บ\nถ้าใช้จริง จะแก้ ${jobLabel(p.job)}\n${lines.join('\n')}`);
     }
   }
 }
@@ -322,11 +366,11 @@ async function reply(client, replyToken, text) {
 // ข้อความขึ้นต้นด้วยคำสั่งไหม → จัดการแล้วคืน true
 async function handleApptText(ctx, replyToken, text, profileKey) {
   ctx = { ...ctx, profile: PROFILES[profileKey] || null };
-  const m = text.match(/^#\s*(นัด|เลื่อน|สรุป|ปฏิทิน)\s*([\s\S]*)$/);
+  const m = text.match(/^#\s*(นัด|แก้|เลื่อน|สรุป|ปฏิทิน)\s*([\s\S]*)$/);
   if (!m) return false;
   try {
     if (m[1] === 'นัด') await handleNew(ctx, replyToken, m[2].trim());
-    else if (m[1] === 'เลื่อน') await handleMove(ctx, replyToken, m[2].trim());
+    else if (m[1] === 'แก้' || m[1] === 'เลื่อน') await handleEdit(ctx, replyToken, m[2].trim());   // #เลื่อน = ชื่อเดิม ทำงานเหมือน #แก้
     else if (m[1] === 'ปฏิทิน') await handleCalendar(ctx, replyToken, m[2].trim());
     else await handleSummary(ctx, replyToken, m[2].trim());
   } catch (err) {
