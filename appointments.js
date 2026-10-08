@@ -254,11 +254,8 @@ async function handleSummary(ctx, replyToken, text) {
     }
   }
   msgs.push(cur);
-  // แนบรูปปฏิทินเดือนนี้ท้ายข้อความ (วาดไม่ได้ก็ส่งแค่ข้อความ ไม่ให้ทั้งคำสั่งพัง)
-  const out = msgs.slice(0, 4).map(text => ({ type: 'text', text }));
-  const img = await monthImage(ctx, zone, 0).catch(err => { console.error('calendar image error:', err); return null; });
-  if (img) out.push(img);
-  await client.replyMessage({ replyToken, messages: out });
+  // รูปปฏิทินไม่แนบแล้ว (user สั่ง 8ต.ค.69) — อยากได้รูปให้พิมพ์ #ปฏิทิน
+  await client.replyMessage({ replyToken, messages: msgs.slice(0, 5).map(text => ({ type: 'text', text })) });
 }
 
 // รูปปฏิทินของเดือน (offset 0 = เดือนนี้, 1 = เดือนหน้า) ตามโซนที่พิมพ์ / โซนของกลุ่ม
