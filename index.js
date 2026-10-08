@@ -70,7 +70,8 @@ async function handleEvent(event) {
 
   if (!groupId && event.source.type === 'user') {
     if (message.type === 'text') {
-      if (await handleApptText({ client, anthropic, supabase }, replyToken, message.text.trim())) return;
+      // ระยะทดสอบ: แชทส่วนตัวจำลองเป็นกลุ่มติดตั้งเชียงราย+ต่างจังหวัด ('north')
+      if (await handleApptText({ client, anthropic, supabase }, replyToken, message.text.trim(), 'north')) return;
       await handleDirectChat(replyToken, event.source.userId, message.text.trim());
     }
     return;

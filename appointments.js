@@ -8,6 +8,12 @@
 const DRY_RUN = true;   // ‼️ เปลี่ยนเป็น false เมื่อพร้อมให้บันทึกลงเว็บจริง (ยังไม่ได้เขียนส่วนบันทึก)
 
 const ZONES = ['กทม', 'เชียงราย', 'เชียงใหม่'];
+// แชทนี้ทำตัวเป็นกลุ่มไหน — กำหนดโซนที่ #สรุป/#เลื่อน ดู และโซนตั้งต้นของ #นัด เมื่อเดาโซนจากข้อความไม่ได้
+// ระยะทดสอบ: แชทส่วนตัว = จำลองกลุ่ม "วัดหน้างาน&ติดตั้งลูกค้า" (เชียงราย+ต่างจังหวัด) ตามที่ user สั่ง 8ต.ค.69
+const PROFILES = {
+  north: { label: '#เชียงราย+ต่างจังหวัด', zones: ['เชียงราย', 'เชียงใหม่'], defaultZone: 'เชียงราย' },
+  bkk: { label: '#กทม', zones: ['กทม'], defaultZone: 'กทม' },
+};
 const DONE = ['ติดตั้งเสร็จ', 'วัดหน้างานแล้ว'];
 const TH_DAYS = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
 
@@ -101,10 +107,15 @@ const whenText = (date, time) => date ? `${thaiDayLabel(date)}${time ? ' เว�
 
 // ── #นัด ──
 async function handleNew(ctx, replyToken, text) {
-  const { client, anthropic } = ctx;
+  const { client, anthropic, profile } = ctx;
   if (!text) return reply(client, replyToken, 'พิมพ์ #นัด ตามด้วยรายละเอียดนัด เช่น\n#นัด ติดตั้ง ศุกร์ 9/10 10.00\nLineOA: Att 0900381117\nคอนโด notting hill ห้อง 1/123\nhttps://maps.app.goo.gl/...');
   const a = await askJson(anthropic, NEW_SYSTEM(), text);
   if (!a) return reply(client, replyToken, 'อ่านข้อความไม่ออก ลองพิมพ์ใหม่อีกทีนะคะ');
+  let zoneNote = '';
+  if (!ZONES.includes(a.install_zone) && profile) {
+    a.install_zone = profile.defaultZone; zoneNote = ' (ตามกลุ่ม)';
+    a.missing = (a.missing || []).filter(x => !/zone|โซน/.test(x));
+  }
   const t = keep({ kind: 'new', data: a });
   // ช่องที่ขาด — AI บางทีตอบเป็นชื่อฟิลด์อังกฤษ แปลงเป็นไทยให้อ่านง่าย
   const TH = { date: 'วัน', time: 'เวลา', customer_id: 'ชื่อไลน์ลูกค้า', customer_real_name: 'ชื่อจริง', phone: 'เบอร์', address: 'ที่อยู่', location_link: 'แผนที่', install_zone: 'โซน' };
@@ -112,7 +123,7 @@ async function handleNew(ctx, replyToken, text) {
   const past = a.date && a.date < bkkToday();
   const rows = [
     ['งาน', a.work_type], ['วันนัด', whenText(a.date, a.time) + (past ? ' ⚠️ วันนี้ผ่านไปแล้ว' : '')], ['ลูกค้า', a.customer_id], ['ชื่อจริง', a.customer_real_name],
-    ['เบอร์', a.phone], ['ที่อยู่', a.address], ['แผนที่', a.location_link], ['โซน', a.install_zone || '❗ไม่รู้โซน'],
+    ['เบอร์', a.phone], ['ที่อยู่', a.address], ['แผนที่', a.location_link], ['โซน', a.install_zone ? a.install_zone + zoneNote : '❗ไม่รู้โซน'],
     ['หมายเหตุ', a.notes], ['ยังขาด', missing.length ? missing.join(', ') : ''],
   ];
   await client.replyMessage({ replyToken, messages: [card('📍 ลงนัดใหม่ (ทดสอบ)', rows,
@@ -120,10 +131,10 @@ async function handleNew(ctx, replyToken, text) {
 }
 
 // หางานจากคำค้น (อ่านอย่างเดียว) — งานที่ยังไม่เสร็จ นัดตั้งแต่ 30 วันก่อน หรือยังไม่มีวัน
-async function findJobs(supabase, query) {
+async function findJobs(supabase, query, profile) {
   const since = new Date(Date.now() - 30 * 86400e3).toISOString();
   const { data, error } = await supabase.from('installations')
-    .select('id, serial_no, appointment_datetime, work_type, customer_id, customer_real_name, phone, install_zone, installation_status')
+    .select('id, serial_no, appointment_datetime, work_type, customer_id, customer_real_name, phone, province, install_zone, installation_status')
     .or(`appointment_datetime.gte.${since},appointment_datetime.is.null`)
     .order('appointment_datetime', { ascending: true, nullsFirst: false })
     .limit(800);
@@ -131,7 +142,9 @@ async function findJobs(supabase, query) {
   const q = String(query || '').trim();
   const qd = digits(q), qn = norm(q);
   const serial = (q.match(/^IN\s*0*(\d+)$/i) || [])[1];
-  return (data || []).filter(r => !DONE.includes(r.installation_status)).filter(r => {
+  return (data || []).filter(r => !DONE.includes(r.installation_status))
+    .filter(r => !profile || ['', ...profile.zones].includes(zoneOf(r)))   // เฉพาะโซนของกลุ่มนี้ (+งานที่ยังไม่ระบุโซน)
+    .filter(r => {
     if (serial) return String(Number(r.serial_no)) === serial;
     if (qd.length >= 6 && digits(r.phone).includes(qd)) return true;
     if (qn.length >= 2 && (norm(r.customer_id).includes(qn) || norm(r.customer_real_name).includes(qn))) return true;
@@ -141,6 +154,13 @@ async function findJobs(supabase, query) {
 const jobLabel = (r) => {
   const { date, time } = toBkk(r.appointment_datetime);
   return `${r.serial_no ? 'IN' + String(r.serial_no).padStart(4, '0') + ' ' : ''}${r.customer_id || r.customer_real_name || '-'} · ${r.work_type || ''} · ${date ? date.slice(8, 10) + '/' + date.slice(5, 7) + (time ? ' ' + time : '') : 'ยังไม่มีวัน'}`;
+};
+
+const shortLabel = (r) => {
+  const { date, time } = toBkk(r.appointment_datetime);
+  const when = date ? `${Number(date.slice(8, 10))}/${Number(date.slice(5, 7))}${time ? ' ' + time : ''}` : 'ไม่มีวัน';
+  const sn = r.serial_no ? 'IN' + String(r.serial_no).padStart(4, '0') + ' ' : '';
+  return `${sn}${when} ${r.customer_id || r.customer_real_name || ''}`.slice(0, 40);
 };
 
 function moveCard(job, a, t) {
@@ -153,13 +173,13 @@ function moveCard(job, a, t) {
 
 // ── #เลื่อน ──
 async function handleMove(ctx, replyToken, text) {
-  const { client, anthropic, supabase } = ctx;
+  const { client, anthropic, supabase, profile } = ctx;
   if (!text) return reply(client, replyToken, 'พิมพ์ #เลื่อน ตามด้วยลูกค้าและวันใหม่ เช่น\n#เลื่อน Att เป็น 9/10 13.00\n(อ้างงานด้วยชื่อไลน์ ชื่อจริง เบอร์ หรือเลข IN ก็ได้)');
   const a = await askJson(anthropic, MOVE_SYSTEM(), text);
   if (!a || !a.query) return reply(client, replyToken, 'ไม่รู้ว่าจะเลื่อนงานของใคร ลองพิมพ์ชื่อลูกค้าหรือเบอร์ด้วยนะคะ');
   if (!a.new_date && !a.new_time) return reply(client, replyToken, `เจองานของ "${a.query}" แต่ไม่รู้ว่าจะเลื่อนเป็นวันไหน ลองพิมพ์ใหม่พร้อมวัน/เวลาใหม่นะคะ`);
-  const jobs = await findJobs(supabase, a.query);
-  if (!jobs.length) return reply(client, replyToken, `ไม่เจองานที่ยังไม่เสร็จของ "${a.query}" ในปฏิทินงานติดตั้ง\nลองค้นด้วยเบอร์ หรือเลข IN แทนได้ค่ะ`);
+  const jobs = await findJobs(supabase, a.query, profile);
+  if (!jobs.length) return reply(client, replyToken, `ไม่เจองานที่ยังไม่เสร็จของ "${a.query}" ในปฏิทินงานติดตั้ง${profile ? ' (ค้นเฉพาะโซน ' + profile.zones.join('/') + ' + งานที่ยังไม่ระบุโซน)' : ''}\nลองค้นด้วยเบอร์ หรือเลข IN แทนได้ค่ะ`);
   if (jobs.length === 1) {
     const t = keep({ kind: 'move', job: jobs[0], data: a });
     return client.replyMessage({ replyToken, messages: [moveCard(jobs[0], a, t)] });
@@ -169,13 +189,14 @@ async function handleMove(ctx, replyToken, text) {
   const msg = card(`เจอ ${jobs.length} งาน — เลือกงานที่จะเลื่อน`, [['ค้นด้วย', a.query]], [], '#4F6D7A');
   msg.contents.footer = { type: 'box', layout: 'vertical', spacing: 'sm', contents: jobs.slice(0, 4).map((j, i) => ({
     type: 'button', style: 'secondary', height: 'sm',
-    action: { type: 'postback', label: jobLabel(j).slice(0, 40), data: `appt:pick:${t}:${i}`, displayText: jobLabel(j) } })) };
+    // ป้ายปุ่ม LINE ยาวได้ 40 ตัว → ใส่แค่เลข IN + วันเวลา + ชื่อ (ชื่อยาวโดนตัดท้ายแทนเวลา)
+    action: { type: 'postback', label: shortLabel(j), data: `appt:pick:${t}:${i}`, displayText: jobLabel(j) } })) };
   return client.replyMessage({ replyToken, messages: [msg] });
 }
 
 // ── #สรุป ── (อ่านอย่างเดียว · หน้าตาเหมือนโพสต์ "🔥อัพเดตงานติดตั้ง" ของทีม)
 async function handleSummary(ctx, replyToken, text) {
-  const { client, supabase } = ctx;
+  const { client, supabase, profile } = ctx;
   const zone = ZONES.find(z => text.includes(z)) || '';
   const from = new Date(`${bkkToday()}T00:00:00+07:00`).toISOString();
   const cols = 'serial_no, appointment_datetime, work_type, customer_id, customer_real_name, phone, province, install_zone, work_details, location_link, notes, installation_status, created_at';
@@ -185,13 +206,17 @@ async function handleSummary(ctx, replyToken, text) {
   const [{ data: up, error: e1 }, { data: wait, error: e2 }] = await Promise.all([q1, q2]);
   if (e1 || e2) throw e1 || e2;
 
-  const zonesToShow = zone ? [zone, ''] : [...ZONES, ''];
+  // ส่วนที่จะโชว์: พิมพ์โซนมาเอง = โซนนั้น · ไม่พิมพ์ = โซนของกลุ่มนี้รวมกัน (ไม่มีกลุ่ม = แยกทุกโซน) · ต่อท้ายงานที่ยังไม่ระบุโซนเสมอ
+  const UNKNOWN = { title: '❓ยังไม่ระบุโซนในเว็บ (ไปใส่โซนในปฏิทินงานติดตั้งด้วย)', zones: [''] };
+  const sections = zone ? [{ title: '#' + zone, zones: [zone] }, UNKNOWN]
+    : profile ? [{ title: profile.label, zones: profile.zones }, UNKNOWN]
+    : [...ZONES.map(z => ({ title: '#' + z, zones: [z] })), UNKNOWN];
   const parts = [];
-  for (const z of zonesToShow) {
-    const rows = (up || []).filter(r => !DONE.includes(r.installation_status) && zoneOf(r) === z);
-    const pend = (wait || []).filter(r => !DONE.includes(r.installation_status) && zoneOf(r) === z);
+  for (const sec of sections) {
+    const rows = (up || []).filter(r => !DONE.includes(r.installation_status) && sec.zones.includes(zoneOf(r)));
+    const pend = (wait || []).filter(r => !DONE.includes(r.installation_status) && sec.zones.includes(zoneOf(r)));
     if (!rows.length && !pend.length) continue;
-    let s = `${z ? '#' + z : '❓ยังไม่ระบุโซนในเว็บ (ไปใส่โซนในปฏิทินงานติดตั้งด้วย)'}\n`;
+    let s = `${sec.title}\n`;
     let lastDate = '';
     for (const r of rows) {
       const { date, time } = toBkk(r.appointment_datetime);
@@ -205,8 +230,8 @@ async function handleSummary(ctx, replyToken, text) {
       if (r.notes) s += `*${r.notes}*\n`;
     }
     if (pend.length) {
-      s += `______________________\n❗❗งานรอยืนยันวัน❗❗\n`;
-      for (const r of pend) s += `- ${r.customer_id || r.customer_real_name || '-'}${r.notes ? ' **' + r.notes : ''}\n`;
+      s += `______________________\n❗❗งานติดตั้งรอยืนยัน❗❗\n`;
+      for (const r of pend) s += `- Line Oa : ${r.customer_id || r.customer_real_name || '-'}${r.notes ? ' **' + r.notes.split('\n')[0] : ''}\n`;
     }
     parts.push(s.trim());
   }
@@ -264,7 +289,8 @@ async function reply(client, replyToken, text) {
 }
 
 // ข้อความขึ้นต้นด้วยคำสั่งไหม → จัดการแล้วคืน true
-async function handleApptText(ctx, replyToken, text) {
+async function handleApptText(ctx, replyToken, text, profileKey) {
+  ctx = { ...ctx, profile: PROFILES[profileKey] || null };
   const m = text.match(/^#\s*(นัด|เลื่อน|สรุป)\s*([\s\S]*)$/);
   if (!m) return false;
   try {
