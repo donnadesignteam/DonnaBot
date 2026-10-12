@@ -77,7 +77,8 @@ const NEW_SYSTEM = () => `คุณอ่านข้อความนัดง
 วันนี้คือ ${bkkToday()} (ปี ค.ศ. · ถ้าเขียนปี พ.ศ. เช่น 2569 ให้ลบ 543 · ถ้าไม่ระบุปีให้ใช้วันที่ที่ใกล้วันนี้ที่สุดที่ยังไม่ผ่านไป)
 รูปแบบ:
 {"work_type":"งานติดตั้ง"|"งานวัดหน้างาน"|"งานแก้","date":"YYYY-MM-DD หรือ ''","time":"HH:MM หรือ ''",
- "customer_id":"ชื่อไลน์/LineOA/Facebook/ชื่อร้านค้าออนไลน์ของลูกค้า","customer_real_name":"ชื่อจริงลูกค้า","phone":"เบอร์ตัวเลขล้วน",
+ "platform":"LineOA"|"Facebook"|"Tiktok-Chat"|"Shopee-Chat"|"หน้าร้าน"|"" (ช่องทางที่ลูกค้าติดต่อมา ถ้าข้อความบอก เช่น "Line OA : Att" = LineOA),
+ "customer_id":"ชื่อไลน์/ชื่อเฟซ/ชื่อร้านค้าออนไลน์ของลูกค้า (ไม่รวมคำว่า LineOA/Facebook)","customer_real_name":"ชื่อจริงลูกค้า","phone":"เบอร์ตัวเลขล้วน",
  "address":"ที่อยู่/ชื่อคอนโด/ห้อง","location_link":"ลิงก์แผนที่ถ้ามี","install_zone":"กทม"|"เชียงราย"|"เชียงใหม่"|"",
  "notes":"รายละเอียดอื่นที่สำคัญ เช่น ให้ช่างเอาอะไรไป ค่าติดตั้ง หมายเหตุ","missing":["ช่องสำคัญที่ไม่มีในข้อความ: วัน, เวลา, ลูกค้า, เบอร์, ที่อยู่"]}
 กติกา: วัดหน้างาน/วัดขนาด = งานวัดหน้างาน · แก้งาน/รีเช็ค/ซ่อม = งานแก้ · นอกนั้น = งานติดตั้ง
@@ -89,18 +90,20 @@ const EDIT_SYSTEM = () => `คุณอ่านคำสั่งแก้ไ�
 วันนี้คือ ${bkkToday()} (ปี พ.ศ. ให้ลบ 543 · ไม่ระบุปีให้ใช้วันที่ที่ใกล้วันนี้ที่สุดที่ยังไม่ผ่านไป)
 {"query":"คำที่ใช้หางาน = ชื่อลูกค้า/ชื่อไลน์/เบอร์เดิม/เลข IN (ไม่ใช่ค่าใหม่)",
  "changes":{ ใส่เฉพาะช่องที่สั่งให้เปลี่ยน:
-   "date":"YYYY-MM-DD","time":"HH:MM","work_type":"งานติดตั้ง"|"งานวัดหน้างาน"|"งานแก้",
+   "date":"YYYY-MM-DD","time":"HH:MM","work_type":"งานติดตั้ง"|"งานวัดหน้างาน"|"งานแก้","platform":"LineOA"|"Facebook"|"Tiktok-Chat"|"Shopee-Chat"|"หน้าร้าน",
    "customer_real_name":"","phone":"ตัวเลขล้วน","province":"ที่อยู่/จังหวัด","location_link":"","install_zone":"กทม"|"เชียงราย"|"เชียงใหม่","notes":"" },
  "notes_mode":"append" (เพิ่มต่อท้ายหมายเหตุเดิม = ค่าตั้งต้น) | "replace" (เมื่อสั่งชัดว่าเปลี่ยน/ลบหมายเหตุเดิม)}
 ตัวอย่าง: "#แก้ Yothaka เป็น 11/10 10.00 เบอร์ 0922836430" → query "Yothaka", changes {date, time, phone}
-"เลื่อนเป็นบ่ายโมง" = time 13:00 · "วัดหน้างาน" = work_type งานวัดหน้างาน`;
+"เลื่อนเป็นบ่ายโมง" = time 13:00 · "วัดหน้างาน" = work_type งานวัดหน้างาน
+‼️ ใส่ date เฉพาะเมื่อคำสั่งบอกวันใหม่ชัดเจน — สั่งแก้แค่เวลา (เช่น "14:00") ห้ามใส่ date ห้ามเดาเป็นวันนี้ · คำว่า LineOA/Facebook ที่นำหน้าชื่อลูกค้าเป็นแค่ตัวบอกว่าลูกค้าคนไหน ไม่ใช่การสั่งแก้ช่องทาง`;
 
 // ช่องที่แก้ได้ → ชื่อไทยในการ์ด (เรียงตามลำดับที่โชว์)
-const EDIT_FIELDS = [['work_type', 'งาน'], ['customer_real_name', 'ชื่อจริง'], ['phone', 'เบอร์'], ['province', 'ที่อยู่'],
+const EDIT_FIELDS = [['work_type', 'งาน'], ['platform', 'ช่องทาง'], ['customer_real_name', 'ชื่อจริง'], ['phone', 'เบอร์'], ['province', 'ที่อยู่'],
   ['location_link', 'แผนที่'], ['install_zone', 'โซน'], ['notes', 'หมายเหตุ']];
 
 // ── การ์ดยืนยัน (Flex) ── โทนสีเดียวกับเว็บ donnaweb (globals.css) · ไม่ใช้อีโมจิ ของที่ต้องเตือนใช้ตัวหนังสือสีแดงอิฐแทน
-const C = { brand: '#9E6A49', dark: '#5C4534', ok: '#6F8F6A', mute: '#8B7460', ink: '#3D2B1F', warn: '#C0563F', surface: '#FBF7F1', cream: '#F0E0D0', line: '#E4D6C6' };
+// done = เขียวชุดเดียวกับป้าย "จัดส่งสำเร็จ" ในเว็บ (DONE_GREEN_BG / DONE_GREEN_INK ใน OrderDetailModal.tsx)
+const C = { brand: '#9E6A49', dark: '#5C4534', done: { bg: '#E3F3E0', ink: '#1F8A3B' }, mute: '#8B7460', ink: '#3D2B1F', warn: '#C0563F', surface: '#FBF7F1', cream: '#F0E0D0', line: '#E4D6C6' };
 // data ขึ้นต้นด้วย http = ปุ่มเปิดลิงก์ · นอกนั้น = ปุ่ม postback
 const btn = (label, data, style, displayText) => ({
   type: 'button', style: style || 'secondary', height: 'sm', color: style === 'primary' ? C.brand : C.cream,
@@ -109,17 +112,16 @@ const btn = (label, data, style, displayText) => ({
 const WEB_URL = (process.env.APPT_WEB_URL || 'https://donna-erp.vercel.app').replace(/\/+$/, '');
 const webBtn = (id) => id ? [['เปิดในเว็บ', `${WEB_URL}/installations?focus=${encodeURIComponent(id)}&openExternalBrowser=1`, 'primary']] : [];
 // rows = [หัวข้อ, ค่า, 'warn'?] — ใส่ 'warn' = ค่านั้นเป็นสีเตือน
+// color = สีพื้นหัวการ์ด (ตัวหนังสือขาว) หรือ { bg, ink }
 function card(title, rows, buttons, color = C.brand) {
+  const head = typeof color === 'string' ? { bg: color, ink: '#FFFFFF' } : color;
   return {
     type: 'flex',
     altText: title,
     contents: {
       type: 'bubble',
-      header: { type: 'box', layout: 'vertical', backgroundColor: color, paddingAll: '16px', spacing: 'xs',
-        contents: [
-          { type: 'text', text: 'DONNA DESIGN', color: C.cream, weight: 'bold', size: 'xxs' },
-          { type: 'text', text: title, color: '#FFFFFF', weight: 'bold', size: 'md', wrap: true },
-        ] },
+      header: { type: 'box', layout: 'vertical', backgroundColor: head.bg, paddingAll: '16px',
+        contents: [{ type: 'text', text: title, color: head.ink, weight: 'bold', size: 'md', wrap: true }] },
       body: { type: 'box', layout: 'vertical', spacing: 'md', backgroundColor: C.surface, paddingAll: '16px',
         contents: rows.filter(([, v]) => v).map(([k, v, tone]) => ({
           type: 'box', layout: 'baseline', spacing: 'sm', contents: [
@@ -144,6 +146,76 @@ const whenTone = (date) => (!date || isSunday(date) ? 'warn' : '');
 const hasDateHint = (text) => /(?<!\d)\d{1,2}\s*\/\s*\d{1,2}(?!\d)|วันที่\s*\d|วันนี้|พรุ่งนี้|มะรืน|จันทร์|อังคาร|พุธ|พฤหัส|ศุกร์|เสาร์|อาทิตย์|สัปดาห์หน้า|ม\.ค|ก\.พ|มี\.ค|เม\.ย|พ\.ค|มิ\.ย|ก\.ค|ส\.ค|ก\.ย|ต\.ค|พ\.ย|ธ\.ค|มกรา|กุมภา|มีนา|เมษา|พฤษภา|มิถุนา|กรกฎา|สิงหา|กันยา|ตุลา|พฤศจิ|ธันวา/
   .test(String(text).replace(/https?:\/\/\S+/g, ' '));
 
+// ── ตัวกันค่าที่ AI เดาเอง ── (12ต.ค.69: #นัด ไม่บอกวันแต่ได้วันนี้ · #แก้ สั่งแค่เวลาแต่วันเปลี่ยนเป็นวันนี้)
+// หลัก: ค่าที่ AI ตอบมาจะถูกใช้ก็ต่อเมื่อ "ข้อความที่พิมพ์" มีหลักฐานของค่านั้น · ไม่มีหลักฐาน = ทิ้ง แล้วให้คนเห็นว่ายังขาด
+const noUrl = (t) => String(t || '').replace(/https?:\/\/\S+/g, ' ');
+const hasTimeHint = (text) => /(?<!\d)\d{1,2}\s*[:.]\s*\d{2}(?!\d)|\d\s*(โมง|ทุ่ม|น\.)|เที่ยง|บ่าย|โมงเช้า|ตอนเช้า|ตอนเย็น|ตีห้า/.test(noUrl(text));
+const validDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || '') && !isNaN(Date.parse(d + 'T00:00:00Z'));
+const normTime = (t) => { const m = String(t || '').match(/^(\d{1,2})[:.](\d{2})$/); return m && +m[1] < 24 && +m[2] < 60 ? m[1].padStart(2, '0') + ':' + m[2] : ''; };
+// คู่ วัน/เดือน ที่พิมพ์มาในข้อความ เช่น 13/10 · 13/10/69 · 13/10/2569 (บ้านเลขที่ 12/5 ก็ติดมาด้วย จึงใช้แค่ "ยืนยัน" วันที่ AI ตอบ ไม่ใช้สร้างวันเอง)
+const PAIR_RE = /(?<![\d\/])(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2}|\d{4}))?(?![\d\/])/g;
+function datePairs(text) {
+  const out = [];
+  for (const m of noUrl(text).matchAll(PAIR_RE)) { const d = +m[1], mo = +m[2]; if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12) out.push({ d, mo, y: m[3] ? +m[3] : 0 }); }
+  return out;
+}
+// วันที่ AI ตอบเชื่อได้ไหม → คืนวันที่ใช้ได้ หรือ '' (ไม่มีหลักฐานในข้อความ)
+//   · ตรงกับคู่ วัน/เดือน ในข้อความ = ใช้ได้ และคำนวณปีเอง (ไม่ระบุปี = ครั้งที่ใกล้สุดที่ยังไม่ผ่าน)
+//   · ไม่ตรงคู่ไหน แต่ข้อความมีคำบอกวัน (ศุกร์นี้ / พรุ่งนี้ / วันที่ 15 / 20 ต.ค.) = เชื่อ AI
+//   · นอกนั้น (เช่น ข้อความมีแต่เวลา) = ทิ้ง
+function trustedDate(aiDate, text) {
+  if (!validDate(aiDate)) return '';
+  const [, am, ad] = aiDate.split('-').map(Number);
+  const pair = datePairs(text).find(p => p.d === ad && p.mo === am);
+  if (pair) {
+    const today = bkkToday(), y0 = +today.slice(0, 4);
+    let y = pair.y; if (y) { if (y < 100) y += 2500; if (y > 2400) y -= 543; }
+    const mk = (yy) => `${yy}-${String(am).padStart(2, '0')}-${String(ad).padStart(2, '0')}`;
+    const out = y ? mk(y) : (mk(y0) >= today ? mk(y0) : mk(y0 + 1));
+    return validDate(out) && new Date(out + 'T00:00:00Z').getUTCDate() === ad ? out : '';
+  }
+  return hasDateHint(noUrl(text).replace(PAIR_RE, ' ')) ? aiDate : '';
+}
+// ช่องทางจากข้อความ — หาเองจากคำที่พิมพ์ (ต้องตรงกับตัวเลือก PLATFORMS ของหน้าปฏิทินในเว็บ)
+const PLATFORM_OK = ['LineOA', 'Facebook', 'Tiktok-Chat', 'Shopee-Chat', 'หน้าร้าน', 'Tiktok', 'Shopee', 'Lazada'];
+function platformFromText(text) {
+  const t = noUrl(text);
+  if (/line\s*-?\s*oa|ไลน์\s*โอเอ|ไลน์โอเอ/i.test(t)) return 'LineOA';
+  if (/facebook|เฟซบุ๊ก|เฟสบุ๊ค|เฟสบุ๊ก|(?<![a-z])fb(?![a-z])|เพจ/i.test(t)) return 'Facebook';
+  if (/tiktok|ติ๊กต็อก|ติ๊กตอก/i.test(t)) return 'Tiktok-Chat';
+  if (/shopee|ช้อปปี้/i.test(t)) return 'Shopee-Chat';
+  if (/หน้าร้าน|walk\s*-?\s*in/i.test(t)) return 'หน้าร้าน';
+  return '';
+}
+// ล้างค่าที่ไม่มีหลักฐานในข้อความ · f = ก้อนค่าที่ AI ตอบ (ของ #นัด หรือ changes ของ #แก้) · คืนรายชื่อช่องที่ถูกทิ้ง
+function sanitize(f, text, { edit = false } = {}) {
+  const dropped = [];
+  const drop = (k) => { if (f[k] != null && f[k] !== '') dropped.push(k); if (edit) delete f[k]; else f[k] = ''; };
+  // วัน: ต้องมีหลักฐานในข้อความ (trustedDate) · ไกลจากวันนี้เกิน 1 ปี = ทิ้ง
+  if (f.date) { const d = trustedDate(f.date, text); if (d) f.date = d; else drop('date'); }
+  if (f.date && Math.abs(Date.parse(f.date + 'T00:00:00Z') - Date.parse(bkkToday() + 'T00:00:00Z')) > 366 * 86400e3) drop('date');
+  // เวลา
+  if (f.time) { const t = normTime(f.time); if (!t || !hasTimeHint(text)) drop('time'); else f.time = t; }
+  // เบอร์: ต้องเป็นเลข 9–10 หลักที่มีอยู่ในข้อความจริง
+  if (f.phone) { const d = digits(f.phone); if (d.length < 9 || d.length > 10 || !digits(noUrl(text)).includes(d)) drop('phone'); else f.phone = d; }
+  // ลิงก์แผนที่: ต้องเป็นลิงก์ที่อยู่ในข้อความ (AI พิมพ์ลิงก์เพี้ยน = ใช้ลิงก์จากข้อความแทน)
+  const url = (String(text).match(/https?:\/\/\S+/) || [''])[0];
+  if (f.location_link && !String(text).includes(f.location_link)) { if (url) f.location_link = url; else drop('location_link'); }
+  // โซน / ชนิดงาน / ช่องทาง: ต้องเป็นค่าที่เว็บรู้จัก
+  if (f.install_zone && !ZONES.includes(f.install_zone)) drop('install_zone');
+  if (f.work_type && !STATUS_BY_TYPE[f.work_type]) drop('work_type');
+  const pf = platformFromText(text);
+  if (pf && !edit) f.platform = pf; else if (f.platform && !PLATFORM_OK.includes(f.platform)) drop('platform');
+  if (edit) {
+    // "#แก้ lineoa: test 14:00" — คำว่า lineoa แค่บอกว่าลูกค้าคนไหน ไม่ใช่สั่งแก้ช่องทาง → แก้ช่องทางเฉพาะเมื่อพิมพ์คำว่า ช่องทาง/แพลตฟอร์ม
+    if (f.platform && !/ช่องทาง|แพลตฟอร์ม|platform/i.test(text)) drop('platform');
+    // #แก้: ช่องที่ไม่ได้สั่งชัดในข้อความ ไม่แตะ
+    if (f.install_zone && !/โซน|กทม|กรุงเทพ|เชียงราย|เชียงใหม่/.test(text)) drop('install_zone');
+    if (f.work_type && !/ติดตั้ง|วัด|งานแก้|แก้งาน|รีเช็ค|ซ่อม/.test(text)) drop('work_type');
+  }
+  return dropped;
+}
+
 // ── #นัด ──
 async function handleNew(ctx, replyToken, text) {
   const { client, anthropic, profile } = ctx;
@@ -151,7 +223,8 @@ async function handleNew(ctx, replyToken, text) {
   const a = await askJson(anthropic, NEW_SYSTEM(), text);
   if (!a) return reply(client, replyToken, 'อ่านข้อความไม่ออก ลองพิมพ์ใหม่อีกทีนะคะ');
   // AI ชอบเดาวันเป็น "วันนี้" ตอนข้อความมีแต่เวลา (12ต.ค.69 user ลองแล้วเจอ) → ข้อความไม่มีอะไรบอกวันเลย = ล้างวันทิ้ง ให้ขึ้น "ยังไม่มีวัน"
-  if (a.date && !hasDateHint(text)) { a.date = ''; a.missing = [...(a.missing || []), 'date']; }
+  const dropped = sanitize(a, text);
+  a.missing = [...(a.missing || []), ...dropped, ...(a.date ? [] : ['date']), ...(a.time ? [] : ['time'])];
   let zoneNote = '';
   if (!ZONES.includes(a.install_zone) && profile) {
     a.install_zone = profile.defaultZone; zoneNote = ' (ตามกลุ่ม)';
@@ -159,7 +232,7 @@ async function handleNew(ctx, replyToken, text) {
   }
   const t = keep({ kind: 'new', data: a });
   // ช่องที่ขาด — AI บางทีตอบเป็นชื่อฟิลด์อังกฤษ แปลงเป็นไทยให้อ่านง่าย
-  const TH = { date: 'วัน', time: 'เวลา', customer_id: 'ชื่อไลน์ลูกค้า', customer_real_name: 'ชื่อจริง', phone: 'เบอร์', address: 'ที่อยู่', location_link: 'แผนที่', install_zone: 'โซน' };
+  const TH = { date: 'วัน', time: 'เวลา', customer_id: 'ชื่อไลน์ลูกค้า', customer_real_name: 'ชื่อจริง', phone: 'เบอร์', address: 'ที่อยู่', location_link: 'แผนที่', install_zone: 'โซน', platform: 'ช่องทาง', work_type: 'ชนิดงาน' };
   const missing = [...new Set((a.missing || []).filter(Boolean).map(x => TH[x] || x))];
   const past = a.date && a.date < bkkToday();
   // ลูกค้าคนนี้มีงานค้างในเว็บอยู่แล้ว (เช่น ลงไว้แต่ยังไม่มีวัน) → เตือน กันลงซ้ำเป็น 2 แถว
@@ -170,7 +243,7 @@ async function handleNew(ctx, replyToken, text) {
     if (same.length) dup = same.slice(0, 3).map(jobLabel).join('\n') + '\nถ้าเป็นงานเดียวกัน กด "แก้" แล้วใช้ #แก้ แทน';
   } catch (err) { console.error('appt dup check:', err.message || err); }
   const rows = [
-    ['งาน', a.work_type], ['วันนัด', whenText(a.date, a.time) + (past ? ' · วันนี้ผ่านไปแล้ว' : ''), past ? 'warn' : whenTone(a.date)], ['ลูกค้า', a.customer_id], ['ชื่อจริง', a.customer_real_name],
+    ['งาน', a.work_type], ['ช่องทาง', a.platform], ['วันนัด', whenText(a.date, a.time) + (past ? ' · วันนี้ผ่านไปแล้ว' : ''), past ? 'warn' : whenTone(a.date)], ['ลูกค้า', a.customer_id], ['ชื่อจริง', a.customer_real_name],
     ['เบอร์', a.phone], ['ที่อยู่', a.address], ['แผนที่', a.location_link], a.install_zone ? ['โซน', a.install_zone + zoneNote] : ['โซน', 'ไม่รู้โซน', 'warn'],
     ['หมายเหตุ', a.notes], ['ยังขาด', missing.length ? missing.join(', ') : '', 'warn'], ['มีงานเดิม', dup, 'warn'],
   ];
@@ -252,6 +325,7 @@ async function handleEdit(ctx, replyToken, text) {
   const a = await askJson(anthropic, EDIT_SYSTEM(), text);
   if (!a || !a.query) return reply(client, replyToken, 'ไม่รู้ว่าจะแก้งานของใคร ลองพิมพ์ชื่อลูกค้า เบอร์ หรือเลข IN ด้วยนะคะ');
   a.changes = Object.fromEntries(Object.entries(a.changes || {}).filter(([, v]) => v != null && v !== ''));
+  sanitize(a.changes, text, { edit: true });   // สั่งแก้แค่เวลา → ไม่ให้วัน (ที่ AI เดาเป็นวันนี้) หลุดเข้ามา
   if (!Object.keys(a.changes).length) return reply(client, replyToken, `เจอคำว่า "${a.query}" แต่ไม่รู้ว่าจะแก้อะไร ลองพิมพ์ใหม่ เช่น "#แก้ ${a.query} เป็น 15/10 13.00" หรือ "#แก้ ${a.query} เบอร์ 08xxxxxxxx"`);
   const jobs = await findJobs(supabase, a.query, profile);
   if (!jobs.length) return reply(client, replyToken, `ไม่เจองานที่ยังไม่เสร็จของ "${a.query}" ในปฏิทินงานติดตั้ง${profile ? ' (ค้นเฉพาะโซน ' + profile.zones.join('/') + ' + งานที่ยังไม่ระบุโซน)' : ''}\nลองค้นด้วยเบอร์ หรือเลข IN แทนได้ค่ะ`);
@@ -415,7 +489,7 @@ async function saveNew(supabase, a) {
     serial_no: await nextSerial(supabase),
     appointment_datetime: apptTs(a.date, a.time),
     work_type: workType,
-    platform: '',
+    platform: a.platform || '',
     customer_id: a.customer_id || '',
     customer_real_name: a.customer_real_name || '',
     province: a.address || '',
@@ -461,7 +535,7 @@ async function saveEdit(supabase, job, a) {
   if (!row.source_order_id) return { row, same: false, warn: await linkOrder(supabase, row) };   // เพิ่งเปลี่ยนเป็นงานติดตั้ง → สร้างใบออเดอร์คู่
   const op = {};
   if ('appointment_datetime' in patch) Object.assign(op, orderWhen(row.appointment_datetime));
-  for (const f of ['phone', 'province', 'location_link']) if (f in patch) op[f] = row[f] || null;
+  for (const f of ['phone', 'province', 'location_link', 'platform']) if (f in patch) op[f] = row[f] || null;
   if ('customer_real_name' in patch) op.customer_name = row.customer_real_name || row.customer_id || null;
   if ('notes' in patch) op.notes = orderNotes(row);
   let warn = '';
@@ -497,10 +571,10 @@ async function handlePostback(ctx, replyToken, data) {
     pending.delete(t);   // ลบก่อนบันทึก — กดยืนยันซ้ำสองทีไม่ได้แถวซ้ำ
     if (p.kind === 'new') {
       const a = p.data;
-      const what = [['งาน', a.work_type], ['วันนัด', whenText(a.date, a.time), whenTone(a.date)], ['ลูกค้า', a.customer_id || a.customer_real_name], ['โซน', a.install_zone]];
+      const what = [['งาน', a.work_type], ['ช่องทาง', a.platform], ['วันนัด', whenText(a.date, a.time), whenTone(a.date)], ['ลูกค้า', a.customer_id || a.customer_real_name], ['โซน', a.install_zone]];
       if (DRY_RUN) return send(card('ทดสอบ · ยังไม่บันทึกลงเว็บ', [['ถ้าใช้จริง', 'จะเพิ่มในปฏิทินงานติดตั้ง'], ...what], [], C.mute));
       const { row, warn } = await saveNew(supabase, a);
-      return send(card('ลงปฏิทินงานติดตั้งแล้ว', [['ใบงาน', serialLabel(row.serial_no)], ...what, ['ต้องดู', warn, 'warn']], webBtn(row.id), C.ok));
+      return send(card('ลงปฏิทินงานติดตั้งแล้ว', [['ใบงาน', serialLabel(row.serial_no)], ...what, ['ต้องดู', warn, 'warn']], webBtn(row.id), C.done));
     }
     const c = p.data.changes || {}, after = applyEdit(p.job, p.data);
     const what = [['ใบงาน', jobLabel(p.job)]];
@@ -510,7 +584,7 @@ async function handlePostback(ctx, replyToken, data) {
     if (DRY_RUN) return send(card('ทดสอบ · ยังไม่แก้ในเว็บ', [['ถ้าใช้จริง', 'จะแก้เป็นค่าตามนี้'], ...what], webBtn(p.job.id), C.mute));
     const { same, warn } = await saveEdit(supabase, p.job, p.data);
     if (same) return reply(client, replyToken, sameReply(p.job));
-    return send(card('แก้ในเว็บแล้ว', [...what, ['ต้องดู', warn, 'warn']], webBtn(p.job.id), C.ok));
+    return send(card('แก้ในเว็บแล้ว', [...what, ['ต้องดู', warn, 'warn']], webBtn(p.job.id), C.done));
   }
 }
 
