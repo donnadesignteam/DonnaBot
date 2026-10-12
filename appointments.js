@@ -96,25 +96,32 @@ const EDIT_SYSTEM = () => `คุณอ่านคำสั่งแก้ไ�
 const EDIT_FIELDS = [['work_type', 'งาน'], ['customer_real_name', 'ชื่อจริง'], ['phone', 'เบอร์'], ['province', 'ที่อยู่'],
   ['location_link', 'แผนที่'], ['install_zone', 'โซน'], ['notes', 'หมายเหตุ']];
 
-// ── การ์ดยืนยัน (Flex) ──
-function card(title, rows, buttons, color = '#8B5E3C') {
+// ── การ์ดยืนยัน (Flex) ── โทนสีเดียวกับเว็บ donnaweb (globals.css) · ไม่ใช้อีโมจิ ของที่ต้องเตือนใช้ตัวหนังสือสีแดงอิฐแทน
+const C = { brand: '#9E6A49', dark: '#5C4534', ok: '#6F8F6A', mute: '#8B7460', ink: '#3D2B1F', warn: '#C0563F', surface: '#FBF7F1', cream: '#F0E0D0', line: '#E4D6C6' };
+const btn = (label, data, style, displayText) => ({
+  type: 'button', style: style || 'secondary', height: 'sm', color: style === 'primary' ? C.brand : C.cream,
+  action: { type: 'postback', label, data, displayText: displayText || label } });
+// rows = [หัวข้อ, ค่า, 'warn'?] — ใส่ 'warn' = ค่านั้นเป็นสีเตือน
+function card(title, rows, buttons, color = C.brand) {
   return {
     type: 'flex',
     altText: title,
     contents: {
       type: 'bubble',
-      header: { type: 'box', layout: 'vertical', backgroundColor: color, paddingAll: '14px',
-        contents: [{ type: 'text', text: title, color: '#FFFFFF', weight: 'bold', size: 'md', wrap: true }] },
-      body: { type: 'box', layout: 'vertical', spacing: 'sm',
-        contents: rows.filter(([, v]) => v).map(([k, v]) => ({
+      header: { type: 'box', layout: 'vertical', backgroundColor: color, paddingAll: '16px', spacing: 'xs',
+        contents: [
+          { type: 'text', text: 'DONNA DESIGN', color: C.cream, weight: 'bold', size: 'xxs' },
+          { type: 'text', text: title, color: '#FFFFFF', weight: 'bold', size: 'md', wrap: true },
+        ] },
+      body: { type: 'box', layout: 'vertical', spacing: 'md', backgroundColor: C.surface, paddingAll: '16px',
+        contents: rows.filter(([, v]) => v).map(([k, v, tone]) => ({
           type: 'box', layout: 'baseline', spacing: 'sm', contents: [
-            { type: 'text', text: k, color: '#8A8A8A', size: 'sm', flex: 3 },
-            { type: 'text', text: String(v), color: '#222222', size: 'sm', flex: 7, wrap: true },
+            { type: 'text', text: k, color: C.mute, size: 'sm', flex: 3 },
+            { type: 'text', text: String(v), color: tone === 'warn' ? C.warn : C.ink, weight: tone === 'warn' ? 'bold' : 'regular', size: 'sm', flex: 7, wrap: true },
           ] })) },
-      footer: buttons.length ? { type: 'box', layout: 'horizontal', spacing: 'sm',
-        contents: buttons.map(([label, data, style]) => ({
-          type: 'button', style: style || 'secondary', height: 'sm', color: style === 'primary' ? '#8B5E3C' : undefined,
-          action: { type: 'postback', label, data, displayText: label } })) } : undefined,
+      footer: buttons.length ? { type: 'box', layout: 'horizontal', spacing: 'sm', backgroundColor: C.surface, paddingAll: '12px',
+        contents: buttons.map(([label, data, style]) => btn(label, data, style)) } : undefined,
+      styles: buttons.length ? { footer: { separator: true, separatorColor: C.line } } : undefined,
     },
   };
 }
@@ -122,8 +129,9 @@ function card(title, rows, buttons, color = '#8B5E3C') {
 // ใช้ในการ์ด/คำตอบยืนยัน · วันอาทิตย์เตือนไว้ (ปฏิทินในเว็บถือว่าร้านปิดวันอาทิตย์)
 const isSunday = (date) => { const [y, m, d] = date.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)).getUTCDay() === 0; };
 const whenText = (date, time) => date
-  ? `${thaiDayLabel(date)}${time ? ' เวลา ' + time + ' น.' : ' (ยังไม่มีเวลา)'}${isSunday(date) ? ' ⚠️ วันอาทิตย์ร้านปิด' : ''}`
-  : '❗ยังไม่มีวัน';
+  ? `${thaiDayLabel(date)}${time ? ' เวลา ' + time + ' น.' : ' (ยังไม่มีเวลา)'}${isSunday(date) ? ' · วันอาทิตย์ร้านปิด' : ''}`
+  : 'ยังไม่มีวัน';
+const whenTone = (date) => (!date || isSunday(date) ? 'warn' : '');
 
 // ── #นัด ──
 async function handleNew(ctx, replyToken, text) {
@@ -146,15 +154,15 @@ async function handleNew(ctx, replyToken, text) {
   try {
     const q = digits(a.phone).length >= 6 ? a.phone : a.customer_id || a.customer_real_name;
     const same = q ? await findJobs(ctx.supabase, q, profile) : [];
-    if (same.length) dup = same.slice(0, 3).map(jobLabel).join('\n') + '\nถ้าเป็นงานเดียวกัน กด ✏️ แก้ แล้วใช้ #แก้ แทน';
+    if (same.length) dup = same.slice(0, 3).map(jobLabel).join('\n') + '\nถ้าเป็นงานเดียวกัน กด "แก้" แล้วใช้ #แก้ แทน';
   } catch (err) { console.error('appt dup check:', err.message || err); }
   const rows = [
-    ['งาน', a.work_type], ['วันนัด', whenText(a.date, a.time) + (past ? ' ⚠️ วันนี้ผ่านไปแล้ว' : '')], ['ลูกค้า', a.customer_id], ['ชื่อจริง', a.customer_real_name],
-    ['เบอร์', a.phone], ['ที่อยู่', a.address], ['แผนที่', a.location_link], ['โซน', a.install_zone ? a.install_zone + zoneNote : '❗ไม่รู้โซน'],
-    ['หมายเหตุ', a.notes], ['ยังขาด', missing.length ? missing.join(', ') : ''], ['⚠️ มีงานเดิม', dup],
+    ['งาน', a.work_type], ['วันนัด', whenText(a.date, a.time) + (past ? ' · วันนี้ผ่านไปแล้ว' : ''), past ? 'warn' : whenTone(a.date)], ['ลูกค้า', a.customer_id], ['ชื่อจริง', a.customer_real_name],
+    ['เบอร์', a.phone], ['ที่อยู่', a.address], ['แผนที่', a.location_link], a.install_zone ? ['โซน', a.install_zone + zoneNote] : ['โซน', 'ไม่รู้โซน', 'warn'],
+    ['หมายเหตุ', a.notes], ['ยังขาด', missing.length ? missing.join(', ') : '', 'warn'], ['มีงานเดิม', dup, 'warn'],
   ];
-  await client.replyMessage({ replyToken, messages: [card('📍 ลงนัดใหม่' + TAG, rows,
-    [['✅ ยืนยัน', `appt:ok:${t}`, 'primary'], ['✏️ แก้', `appt:edit:${t}`]])] });
+  await client.replyMessage({ replyToken, messages: [card('ลงนัดใหม่' + TAG, rows,
+    [['ยืนยัน', `appt:ok:${t}`, 'primary'], ['แก้', `appt:edit:${t}`]])] });
 }
 
 // หางานจากคำค้น (อ่านอย่างเดียว) — งานที่ยังไม่เสร็จ นัดตั้งแต่ 30 วันก่อน หรือยังไม่มีวัน
@@ -221,7 +229,7 @@ function editCard(job, a, t) {
     const was = String(job[f] || '-');
     rows.push([label, f === 'notes' && a.notes_mode !== 'replace' && job.notes ? `เพิ่มต่อท้าย: ${c.notes}` : `${was.length > 60 ? was.slice(0, 60) + '…' : was}\n→ ${after[f]}`]);
   }
-  return card('✏️ แก้ไขงาน' + TAG, rows, [['✅ ยืนยัน', `appt:ok:${t}`, 'primary'], ['✖️ ยกเลิก', `appt:edit:${t}`]], '#4F6D7A');
+  return card('แก้ไขงาน' + TAG, rows, [['ยืนยัน', `appt:ok:${t}`, 'primary'], ['ยกเลิก', `appt:edit:${t}`]], C.dark);
 }
 
 // ── #แก้ (และ #เลื่อน) ──
@@ -241,11 +249,10 @@ async function handleEdit(ctx, replyToken, text) {
   }
   // เจอหลายงาน → ให้เลือก (ปุ่มละงาน สูงสุด 4)
   const t = keep({ kind: 'pick', jobs: jobs.slice(0, 4), data: a });
-  const msg = card(`เจอ ${jobs.length} งาน — เลือกงานที่จะแก้`, [['ค้นด้วย', a.query]], [], '#4F6D7A');
-  msg.contents.footer = { type: 'box', layout: 'vertical', spacing: 'sm', contents: jobs.slice(0, 4).map((j, i) => ({
-    type: 'button', style: 'secondary', height: 'sm',
-    // ป้ายปุ่ม LINE ยาวได้ 40 ตัว → ใส่แค่เลข IN + วันเวลา + ชื่อ (ชื่อยาวโดนตัดท้ายแทนเวลา)
-    action: { type: 'postback', label: shortLabel(j), data: `appt:pick:${t}:${i}`, displayText: jobLabel(j) } })) };
+  const msg = card(`เจอ ${jobs.length} งาน — เลือกงานที่จะแก้`, [['ค้นด้วย', a.query]], [], C.dark);
+  // ป้ายปุ่ม LINE ยาวได้ 40 ตัว → ใส่แค่เลข IN + วันเวลา + ชื่อ (ชื่อยาวโดนตัดท้ายแทนเวลา)
+  msg.contents.footer = { type: 'box', layout: 'vertical', spacing: 'sm', backgroundColor: C.surface, paddingAll: '12px',
+    contents: jobs.slice(0, 4).map((j, i) => btn(shortLabel(j), `appt:pick:${t}:${i}`, '', jobLabel(j))) };
   return client.replyMessage({ replyToken, messages: [msg] });
 }
 
@@ -382,9 +389,9 @@ async function linkOrder(supabase, ins) {
     updated_at: now,
     ...BOT,
   }).select('id').single();
-  if (error) return `⚠️ สร้างใบออเดอร์คู่ไม่สำเร็จ (${error.message}) — เปิดงานนี้ในเว็บแล้วกดบันทึกอีกทีนะคะ`;
+  if (error) return `สร้างใบออเดอร์คู่ไม่สำเร็จ (${error.message}) — เปิดงานนี้ในเว็บแล้วกดบันทึกอีกทีนะคะ`;
   const { error: e2 } = await supabase.from('installations').update({ source_order_id: data.id, ...BOT }).eq('id', ins.id);
-  return e2 ? `⚠️ ผูกใบออเดอร์กับงานนี้ไม่สำเร็จ (${e2.message})` : '';
+  return e2 ? `ผูกใบออเดอร์กับงานนี้ไม่สำเร็จ (${e2.message})` : '';
 }
 
 // #นัด → เพิ่มแถวในปฏิทินงานติดตั้ง
@@ -447,7 +454,7 @@ async function saveEdit(supabase, job, a) {
   let warn = '';
   if (Object.keys(op).length) {
     const { error: e2 } = await supabase.from('order_entries').update({ ...op, updated_at: now, last_content_at: now, ...BOT }).eq('id', row.source_order_id);
-    if (e2) warn = `⚠️ แก้ในปฏิทินแล้ว แต่ใบออเดอร์ที่ผูกไว้แก้ไม่สำเร็จ (${e2.message})`;
+    if (e2) warn = `แก้ในปฏิทินแล้ว แต่ใบออเดอร์ที่ผูกไว้แก้ไม่สำเร็จ (${e2.message})`;
   }
   return { row, same: false, warn };
 }
@@ -456,6 +463,7 @@ async function saveEdit(supabase, job, a) {
 async function handlePostback(ctx, replyToken, data) {
   const { client, supabase } = ctx;
   const [, act, t, idx] = data.split(':');
+  const send = (msg) => client.replyMessage({ replyToken, messages: [msg] });
   const p = pending.get(t);
   if (!p) return reply(client, replyToken, 'การ์ดนี้หมดอายุแล้ว (เกิน 2 ชม. หรือบอทเพิ่งรีสตาร์ท) พิมพ์คำสั่งใหม่อีกทีนะคะ');
   if (act === 'edit') {
@@ -476,20 +484,20 @@ async function handlePostback(ctx, replyToken, data) {
     pending.delete(t);   // ลบก่อนบันทึก — กดยืนยันซ้ำสองทีไม่ได้แถวซ้ำ
     if (p.kind === 'new') {
       const a = p.data;
-      const what = `${a.work_type} · ${whenText(a.date, a.time)}\n${a.customer_id || a.customer_real_name || ''}${a.install_zone ? ' · โซน' + a.install_zone : ''}`;
-      if (DRY_RUN) return reply(client, replyToken, `🧪 ทดสอบ — ยังไม่บันทึกลงเว็บ\nถ้าใช้จริง จะเพิ่มในปฏิทินงานติดตั้ง:\n${what}`);
+      const what = [['งาน', a.work_type], ['วันนัด', whenText(a.date, a.time), whenTone(a.date)], ['ลูกค้า', a.customer_id || a.customer_real_name], ['โซน', a.install_zone]];
+      if (DRY_RUN) return send(card('ทดสอบ · ยังไม่บันทึกลงเว็บ', [['ถ้าใช้จริง', 'จะเพิ่มในปฏิทินงานติดตั้ง'], ...what], [], C.mute));
       const { row, warn } = await saveNew(supabase, a);
-      return reply(client, replyToken, `✅ ลงปฏิทินงานติดตั้งแล้ว ${serialLabel(row.serial_no)}\n${what}${warn ? '\n' + warn : ''}`);
+      return send(card('ลงปฏิทินงานติดตั้งแล้ว', [['ใบงาน', serialLabel(row.serial_no)], ...what, ['ต้องดู', warn, 'warn']], [], C.ok));
     }
     const c = p.data.changes || {}, after = applyEdit(p.job, p.data);
-    const lines = [];
+    const what = [['ใบงาน', jobLabel(p.job)]];
     const old = toBkk(p.job.appointment_datetime);
-    if ((c.date && c.date !== old.date) || (c.time && c.time !== old.time)) lines.push(`วันนัด → ${whenText(after.date, after.time)}`);
-    for (const [f, label] of EDIT_FIELDS) if (after[f] !== undefined) lines.push(`${label} → ${f === 'notes' && p.data.notes_mode !== 'replace' && p.job.notes ? '(ต่อท้าย) ' + c.notes : after[f]}`);
-    if (DRY_RUN) return reply(client, replyToken, `🧪 ทดสอบ — ยังไม่แก้ในเว็บ\nถ้าใช้จริง จะแก้ ${jobLabel(p.job)}\n${lines.join('\n')}`);
+    if ((c.date && c.date !== old.date) || (c.time && c.time !== old.time)) what.push(['วันนัด', whenText(after.date, after.time), whenTone(after.date)]);
+    for (const [f, label] of EDIT_FIELDS) if (after[f] !== undefined) what.push([label, f === 'notes' && p.data.notes_mode !== 'replace' && p.job.notes ? '(ต่อท้าย) ' + c.notes : after[f]]);
+    if (DRY_RUN) return send(card('ทดสอบ · ยังไม่แก้ในเว็บ', [['ถ้าใช้จริง', 'จะแก้เป็นค่าตามนี้'], ...what], [], C.mute));
     const { same, warn } = await saveEdit(supabase, p.job, p.data);
     if (same) return reply(client, replyToken, sameReply(p.job));
-    return reply(client, replyToken, `✅ แก้ในเว็บแล้ว ${jobLabel(p.job)}\n${lines.join('\n')}${warn ? '\n' + warn : ''}`);
+    return send(card('แก้ในเว็บแล้ว', [...what, ['ต้องดู', warn, 'warn']], [], C.ok));
   }
 }
 
