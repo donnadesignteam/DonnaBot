@@ -114,9 +114,9 @@ const C = { brand: '#9E6A49', dark: '#5C4534', done: { bg: '#E3F3E0', ink: '#1F8
 const btn = (label, data, style, displayText) => ({
   type: 'button', style: style || 'secondary', height: 'sm', color: style === 'primary' ? C.brand : C.cream,
   action: /^https?:/.test(data) ? { type: 'uri', label, uri: data } : { type: 'postback', label, data, displayText: displayText || label } });
-// ลิงก์ไปปฏิทินงานติดตั้งในเว็บ — หน้าเว็บเลื่อนไปที่งานนั้นแล้วกระพริบ (?focus=) · openExternalBrowser = เปิดเบราว์เซอร์ของเครื่อง (ที่ล็อกอินเว็บไว้) แทนเบราว์เซอร์ในไลน์
+// ลิงก์ไปปฏิทินงานติดตั้งในเว็บ ผ่านหน้า /go (เบา เลือกหน้าคอม/มือถือให้เอง) — หน้าเว็บเลื่อนไปที่งานนั้นแล้วกระพริบ (?focus=) · openExternalBrowser = เปิดเบราว์เซอร์ของเครื่อง (ที่ล็อกอินเว็บไว้) แทนเบราว์เซอร์ในไลน์
 const WEB_URL = (process.env.APPT_WEB_URL || 'https://donna-erp.vercel.app').replace(/\/+$/, '');
-const webBtn = (id) => id ? [['เปิดในเว็บ', `${WEB_URL}/installations?focus=${encodeURIComponent(id)}&openExternalBrowser=1`, 'primary']] : [];
+const webBtn = (id) => id ? [['เปิดในเว็บ', `${WEB_URL}/go?focus=${encodeURIComponent(id)}&openExternalBrowser=1`, 'primary']] : [];
 // rows = [หัวข้อ, ค่า, 'warn'?] — ใส่ 'warn' = ค่านั้นเป็นสีเตือน
 // color = สีพื้นหัวการ์ด (ตัวหนังสือขาว) หรือ { bg, ink }
 function card(title, rows, buttons, color = C.brand) {
