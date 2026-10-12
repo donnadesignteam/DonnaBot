@@ -73,8 +73,6 @@ async function handleEvent(event) {
 
   if (!groupId && event.source.type === 'user') {
     if (message.type === 'text') {
-      // ระยะทดสอบ: แชทส่วนตัวจำลองเป็นกลุ่มติดตั้งเชียงราย+ต่างจังหวัด ('north')
-      if (await handleApptText({ client, anthropic, supabase }, replyToken, message.text.trim(), 'north')) return;
       await handleDirectChat(replyToken, event.source.userId, message.text.trim());
     }
     return;
@@ -88,6 +86,9 @@ async function handleEvent(event) {
     }
     if (message.type === 'text') {
       const text = message.text.trim();
+      // คำสั่งงานติดตั้ง #นัด/#แก้/#สรุป/#ปฏิทิน — ระยะทดสอบ (12ต.ค.69 ย้ายจากแชทส่วนตัวมากลุ่มทดสอบ ตามที่ user สั่ง)
+      // กลุ่มทดสอบจำลองเป็นกลุ่มติดตั้งเชียงราย+ต่างจังหวัด ('north') · ยังเป็น DRY_RUN ไม่เขียนเว็บ
+      if (groupId === GROUP_TEST && await handleApptText({ client, anthropic, supabase }, replyToken, text, 'north')) return;
       if (text === 'ถูก') {
         await handleFeedbackCorrect(replyToken, groupId);
         return;
