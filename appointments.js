@@ -469,7 +469,7 @@ async function handlePostback(ctx, replyToken, data) {
   const [, act, t, idx] = data.split(':');
   const send = (msg) => client.replyMessage({ replyToken, messages: [msg] });
   const p = pending.get(t);
-  if (!p) return reply(client, replyToken, 'การ์ดนี้หมดอายุแล้ว (เกิน 2 ชม. หรือบอทเพิ่งรีสตาร์ท) พิมพ์คำสั่งใหม่อีกทีนะคะ');
+  if (!p) return reply(client, replyToken, 'การ์ดนี้หมดอายุแล้ว');
   if (act === 'edit') {
     pending.delete(t);
     return reply(client, replyToken, p.kind === 'new'
