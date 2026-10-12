@@ -98,9 +98,13 @@ const EDIT_FIELDS = [['work_type', 'งาน'], ['customer_real_name', 'ชื�
 
 // ── การ์ดยืนยัน (Flex) ── โทนสีเดียวกับเว็บ donnaweb (globals.css) · ไม่ใช้อีโมจิ ของที่ต้องเตือนใช้ตัวหนังสือสีแดงอิฐแทน
 const C = { brand: '#9E6A49', dark: '#5C4534', ok: '#6F8F6A', mute: '#8B7460', ink: '#3D2B1F', warn: '#C0563F', surface: '#FBF7F1', cream: '#F0E0D0', line: '#E4D6C6' };
+// data ขึ้นต้นด้วย http = ปุ่มเปิดลิงก์ · นอกนั้น = ปุ่ม postback
 const btn = (label, data, style, displayText) => ({
   type: 'button', style: style || 'secondary', height: 'sm', color: style === 'primary' ? C.brand : C.cream,
-  action: { type: 'postback', label, data, displayText: displayText || label } });
+  action: /^https?:/.test(data) ? { type: 'uri', label, uri: data } : { type: 'postback', label, data, displayText: displayText || label } });
+// ลิงก์ไปปฏิทินงานติดตั้งในเว็บ — หน้าเว็บเลื่อนไปที่งานนั้นแล้วกระพริบ (?focus=) · openExternalBrowser = เปิดเบราว์เซอร์ของเครื่อง (ที่ล็อกอินเว็บไว้) แทนเบราว์เซอร์ในไลน์
+const WEB_URL = (process.env.APPT_WEB_URL || 'https://donna-erp.vercel.app').replace(/\/+$/, '');
+const webBtn = (id) => id ? [['เปิดในเว็บ', `${WEB_URL}/installations?focus=${encodeURIComponent(id)}&openExternalBrowser=1`, 'primary']] : [];
 // rows = [หัวข้อ, ค่า, 'warn'?] — ใส่ 'warn' = ค่านั้นเป็นสีเตือน
 function card(title, rows, buttons, color = C.brand) {
   return {
@@ -487,17 +491,17 @@ async function handlePostback(ctx, replyToken, data) {
       const what = [['งาน', a.work_type], ['วันนัด', whenText(a.date, a.time), whenTone(a.date)], ['ลูกค้า', a.customer_id || a.customer_real_name], ['โซน', a.install_zone]];
       if (DRY_RUN) return send(card('ทดสอบ · ยังไม่บันทึกลงเว็บ', [['ถ้าใช้จริง', 'จะเพิ่มในปฏิทินงานติดตั้ง'], ...what], [], C.mute));
       const { row, warn } = await saveNew(supabase, a);
-      return send(card('ลงปฏิทินงานติดตั้งแล้ว', [['ใบงาน', serialLabel(row.serial_no)], ...what, ['ต้องดู', warn, 'warn']], [], C.ok));
+      return send(card('ลงปฏิทินงานติดตั้งแล้ว', [['ใบงาน', serialLabel(row.serial_no)], ...what, ['ต้องดู', warn, 'warn']], webBtn(row.id), C.ok));
     }
     const c = p.data.changes || {}, after = applyEdit(p.job, p.data);
     const what = [['ใบงาน', jobLabel(p.job)]];
     const old = toBkk(p.job.appointment_datetime);
     if ((c.date && c.date !== old.date) || (c.time && c.time !== old.time)) what.push(['วันนัด', whenText(after.date, after.time), whenTone(after.date)]);
     for (const [f, label] of EDIT_FIELDS) if (after[f] !== undefined) what.push([label, f === 'notes' && p.data.notes_mode !== 'replace' && p.job.notes ? '(ต่อท้าย) ' + c.notes : after[f]]);
-    if (DRY_RUN) return send(card('ทดสอบ · ยังไม่แก้ในเว็บ', [['ถ้าใช้จริง', 'จะแก้เป็นค่าตามนี้'], ...what], [], C.mute));
+    if (DRY_RUN) return send(card('ทดสอบ · ยังไม่แก้ในเว็บ', [['ถ้าใช้จริง', 'จะแก้เป็นค่าตามนี้'], ...what], webBtn(p.job.id), C.mute));
     const { same, warn } = await saveEdit(supabase, p.job, p.data);
     if (same) return reply(client, replyToken, sameReply(p.job));
-    return send(card('แก้ในเว็บแล้ว', [...what, ['ต้องดู', warn, 'warn']], [], C.ok));
+    return send(card('แก้ในเว็บแล้ว', [...what, ['ต้องดู', warn, 'warn']], webBtn(p.job.id), C.ok));
   }
 }
 
