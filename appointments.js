@@ -1,12 +1,16 @@
 // ── ลงนัดติดตั้ง/วัดหน้างานผ่านแชท LINE ─────────────────────────────
 // คำสั่ง: #นัด <ข้อความนัดแบบที่ทีมโพสต์ในกลุ่ม> · #แก้ <ลูกค้า> <วันเวลาใหม่/ช่องที่แก้> (#เลื่อน ใช้แทนกันได้) · #สรุป [โซน] · #ปฏิทิน [โซน] [เดือน]
-// ระยะทดสอบ: ใช้ในกลุ่มทดสอบ (GROUP_TEST ใน index.js — 12ต.ค.69 ย้ายจากแชทส่วนตัว) และ **ไม่เขียนตาราง installations**
+// ระยะทดสอบ: ใช้ในกลุ่มทดสอบ (GROUP_TEST ใน index.js — 12ต.ค.69 ย้ายจากแชทส่วนตัว) และ **ไม่เขียนตาราง installations** (DRY_RUN)
 //   · #นัด / #เลื่อน → AI อ่านข้อความ → การ์ดยืนยัน → กด ✅ แค่ตอบว่า "ถ้าใช้จริงจะบันทึกอะไร"
 //   · #สรุป / การหางานของ #เลื่อน = อ่านตาราง installations จริง (อ่านอย่างเดียว)
+// ใช้จริง (ปิด DRY_RUN): กด ✅ → saveNew / saveEdit เขียนลงเว็บแบบเดียวกับหน้าปฏิทินงานติดตั้งของ donnaweb
+//   (เลข IN จากตัวนับกลาง · งานติดตั้งสร้างใบออเดอร์คู่ให้ · แก้แล้ว sync ไปใบออเดอร์ที่ผูกไว้)
 // ตอบด้วย reply ทั้งหมด (ฟรี ไม่กินโควตาข้อความ LINE)
 
 const { calendarMessage } = require('./calendar');
-const DRY_RUN = true;   // ‼️ เปลี่ยนเป็น false เมื่อพร้อมให้บันทึกลงเว็บจริง (ยังไม่ได้เขียนส่วนบันทึก)
+// ‼️ ยังไม่บันทึกลงเว็บจริง จนกว่าจะตั้ง APPT_DRY_RUN=false ใน Railway (ไม่ตั้ง = ทดสอบเหมือนเดิม)
+const DRY_RUN = process.env.APPT_DRY_RUN !== 'false';
+const TAG = DRY_RUN ? ' (ทดสอบ)' : '';
 
 const ZONES = ['กทม', 'เชียงราย', 'เชียงใหม่'];
 // แชทนี้ทำตัวเป็นกลุ่มไหน — กำหนดโซนที่ #สรุป/#เลื่อน ดู และโซนตั้งต้นของ #นัด เมื่อเดาโซนจากข้อความไม่ได้
@@ -137,12 +141,19 @@ async function handleNew(ctx, replyToken, text) {
   const TH = { date: 'วัน', time: 'เวลา', customer_id: 'ชื่อไลน์ลูกค้า', customer_real_name: 'ชื่อจริง', phone: 'เบอร์', address: 'ที่อยู่', location_link: 'แผนที่', install_zone: 'โซน' };
   const missing = [...new Set((a.missing || []).filter(Boolean).map(x => TH[x] || x))];
   const past = a.date && a.date < bkkToday();
+  // ลูกค้าคนนี้มีงานค้างในเว็บอยู่แล้ว (เช่น ลงไว้แต่ยังไม่มีวัน) → เตือน กันลงซ้ำเป็น 2 แถว
+  let dup = '';
+  try {
+    const q = digits(a.phone).length >= 6 ? a.phone : a.customer_id || a.customer_real_name;
+    const same = q ? await findJobs(ctx.supabase, q, profile) : [];
+    if (same.length) dup = same.slice(0, 3).map(jobLabel).join('\n') + '\nถ้าเป็นงานเดียวกัน กด ✏️ แก้ แล้วใช้ #แก้ แทน';
+  } catch (err) { console.error('appt dup check:', err.message || err); }
   const rows = [
     ['งาน', a.work_type], ['วันนัด', whenText(a.date, a.time) + (past ? ' ⚠️ วันนี้ผ่านไปแล้ว' : '')], ['ลูกค้า', a.customer_id], ['ชื่อจริง', a.customer_real_name],
     ['เบอร์', a.phone], ['ที่อยู่', a.address], ['แผนที่', a.location_link], ['โซน', a.install_zone ? a.install_zone + zoneNote : '❗ไม่รู้โซน'],
-    ['หมายเหตุ', a.notes], ['ยังขาด', missing.length ? missing.join(', ') : ''],
+    ['หมายเหตุ', a.notes], ['ยังขาด', missing.length ? missing.join(', ') : ''], ['⚠️ มีงานเดิม', dup],
   ];
-  await client.replyMessage({ replyToken, messages: [card('📍 ลงนัดใหม่ (ทดสอบ)', rows,
+  await client.replyMessage({ replyToken, messages: [card('📍 ลงนัดใหม่' + TAG, rows,
     [['✅ ยืนยัน', `appt:ok:${t}`, 'primary'], ['✏️ แก้', `appt:edit:${t}`]])] });
 }
 
@@ -210,7 +221,7 @@ function editCard(job, a, t) {
     const was = String(job[f] || '-');
     rows.push([label, f === 'notes' && a.notes_mode !== 'replace' && job.notes ? `เพิ่มต่อท้าย: ${c.notes}` : `${was.length > 60 ? was.slice(0, 60) + '…' : was}\n→ ${after[f]}`]);
   }
-  return card('✏️ แก้ไขงาน (ทดสอบ)', rows, [['✅ ยืนยัน', `appt:ok:${t}`, 'primary'], ['✖️ ยกเลิก', `appt:edit:${t}`]], '#4F6D7A');
+  return card('✏️ แก้ไขงาน' + TAG, rows, [['✅ ยืนยัน', `appt:ok:${t}`, 'primary'], ['✖️ ยกเลิก', `appt:edit:${t}`]], '#4F6D7A');
 }
 
 // ── #แก้ (และ #เลื่อน) ──
@@ -322,9 +333,128 @@ async function handleCalendar(ctx, replyToken, text) {
   await ctx.client.replyMessage({ replyToken, messages: [img] });
 }
 
+// ── บันทึกลงเว็บจริง ── (ตามแบบหน้าปฏิทินงานติดตั้งของ donnaweb: save() + lib/installOrderSync.ts — แก้ที่นั่นต้องแก้ที่นี่คู่กัน)
+const BOT = { actor_code: null, actor_name: 'บอทไลน์' };   // ชื่อคนทำในประวัติของเว็บ
+const STATUS_BY_TYPE = { 'งานติดตั้ง': 'รอนัดหมาย', 'งานวัดหน้างาน': 'รอนัดหมาย', 'งานแก้': 'รอแก้' };
+const TECH_BY_ZONE = { 'กทม': 'ช่างนอก' };
+const apptTs = (date, time) => date ? `${date}T${String(time || '9:00').padStart(5, '0')}:00+07:00` : null;
+const serialLabel = (s) => s ? 'IN' + String(Number(s)).padStart(4, '0') : '';
+const orderNotes = (r) => [r.work_details, r.notes].map(v => String(v ?? '').trim()).filter(Boolean).join(' · ') || null;
+// วัน/เวลาของใบออเดอร์จากวันนัด (install_time ฝั่งออเดอร์เก็บแบบ 9:00 ไม่เติม 0)
+const orderWhen = (ts) => {
+  const { date, time } = toBkk(ts);
+  return { deadline: date || null, installation_date: date || null, install_time: date ? `${Number(time.slice(0, 2))}:${time.slice(3, 5)}` : '9:00' };
+};
+
+// เลข IN ถัดไปจากตัวนับกลาง (rpc take_serial) — ใบที่ลบแล้วเลขไม่ถูกใช้ซ้ำ · rpc พังใช้เลขมากสุด+1
+async function nextSerial(supabase) {
+  const { data, error } = await supabase.from('installations').select('serial_no');
+  if (error) throw error;
+  const floor = (data || []).reduce((mx, r) => Math.max(mx, parseInt(String(r.serial_no || '').replace(/\D/g, ''), 10) || 0), 0);
+  let n = floor + 1;
+  try {
+    const res = await supabase.rpc('take_serial', { p_kind: 'install', p_floor: floor });
+    if (!res.error && typeof res.data === 'number' && res.data > floor) n = res.data;
+  } catch { /* ใช้ floor + 1 */ }
+  return String(n).padStart(4, '0');
+}
+
+// งานติดตั้งต้องมีใบออเดอร์คู่ ฝ่ายผลิตถึงจะเห็นในหมวดออเดอร์ → สร้างแล้วผูกด้วย source_order_id (คืนข้อความเตือนถ้าไม่สำเร็จ)
+async function linkOrder(supabase, ins) {
+  if (ins.work_type !== 'งานติดตั้ง' || ins.source_order_id) return '';
+  const now = new Date().toISOString();
+  const { data, error } = await supabase.from('order_entries').insert({
+    entry_date: bkkToday(),
+    customer_name: ins.customer_real_name || ins.customer_id || null,
+    platform: ins.platform || null,
+    is_installation: true,
+    ...orderWhen(ins.appointment_datetime),
+    province: ins.province || null,
+    phone: ins.phone || null,
+    location_link: ins.location_link || null,
+    notes: orderNotes(ins),
+    price: ins.price ?? null,
+    payment_status: 'ยังไม่ชำระ',
+    order_status: 'รอดำเนินการ',
+    status: 'อยู่ในกำหนด',
+    order_assigned: 'รออัพเดท',
+    admin_name: ins.entered_by || null,
+    updated_at: now,
+    ...BOT,
+  }).select('id').single();
+  if (error) return `⚠️ สร้างใบออเดอร์คู่ไม่สำเร็จ (${error.message}) — เปิดงานนี้ในเว็บแล้วกดบันทึกอีกทีนะคะ`;
+  const { error: e2 } = await supabase.from('installations').update({ source_order_id: data.id, ...BOT }).eq('id', ins.id);
+  return e2 ? `⚠️ ผูกใบออเดอร์กับงานนี้ไม่สำเร็จ (${e2.message})` : '';
+}
+
+// #นัด → เพิ่มแถวในปฏิทินงานติดตั้ง
+async function saveNew(supabase, a) {
+  const zone = ZONES.includes(a.install_zone) ? a.install_zone : '';
+  const workType = STATUS_BY_TYPE[a.work_type] ? a.work_type : 'งานติดตั้ง';
+  const { data: row, error } = await supabase.from('installations').insert({
+    serial_no: await nextSerial(supabase),
+    appointment_datetime: apptTs(a.date, a.time),
+    work_type: workType,
+    platform: '',
+    customer_id: a.customer_id || '',
+    customer_real_name: a.customer_real_name || '',
+    province: a.address || '',
+    install_zone: zone,
+    technician_type: TECH_BY_ZONE[zone] || '',
+    phone: digits(a.phone),
+    work_details: '',
+    location_link: a.location_link || '',
+    price: 0,
+    notes: a.notes || '',
+    payment_status: 'รอมัดจำ',
+    appointment_status: 'นัดหมายแล้ว',
+    production_status: 'กำลังผลิต',
+    send_to_technician: 'หน้าร้าน',
+    installation_status: STATUS_BY_TYPE[workType],
+    entered_by: '',
+    updated_at: new Date().toISOString(),
+    ...BOT,
+  }).select().single();
+  if (error) throw error;
+  return { row, warn: await linkOrder(supabase, row) };
+}
+
+// #แก้ → แก้เฉพาะช่องที่สั่ง (อ่านแถวล่าสุดก่อน เผื่อเว็บแก้ไประหว่างรอกดยืนยัน) แล้ว sync ช่องเดียวกันไปใบออเดอร์ที่ผูกไว้
+async function saveEdit(supabase, job, a) {
+  const { data: cur, error } = await supabase.from('installations').select('*').eq('id', job.id).maybeSingle();
+  if (error) throw error;
+  if (!cur) throw new Error('งานนี้ถูกลบออกจากเว็บไปแล้ว');
+  const c = a.changes || {}, old = toBkk(cur.appointment_datetime), after = applyEdit(cur, a);
+  const patch = {};
+  if ((c.date && c.date !== old.date) || (c.time && c.time !== old.time)) {
+    if (!after.date) throw new Error(`งานนี้ยังไม่มีวันนัด พิมพ์วันมาด้วยนะคะ เช่น "#แก้ ${a.query} เป็น 15/10 13.00"`);
+    patch.appointment_datetime = apptTs(after.date, after.time);
+  }
+  for (const [f] of EDIT_FIELDS) if (after[f] !== undefined) patch[f] = f === 'phone' ? digits(after[f]) : after[f];
+  if (!Object.keys(patch).length) return { row: cur, same: true, warn: '' };
+  if (TECH_BY_ZONE[patch.install_zone] && !cur.technician_type) patch.technician_type = TECH_BY_ZONE[patch.install_zone];
+  const now = new Date().toISOString();
+  const { error: e1 } = await supabase.from('installations').update({ ...patch, updated_at: now, ...BOT }).eq('id', cur.id);
+  if (e1) throw e1;
+
+  const row = { ...cur, ...patch };
+  if (!row.source_order_id) return { row, same: false, warn: await linkOrder(supabase, row) };   // เพิ่งเปลี่ยนเป็นงานติดตั้ง → สร้างใบออเดอร์คู่
+  const op = {};
+  if ('appointment_datetime' in patch) Object.assign(op, orderWhen(row.appointment_datetime));
+  for (const f of ['phone', 'province', 'location_link']) if (f in patch) op[f] = row[f] || null;
+  if ('customer_real_name' in patch) op.customer_name = row.customer_real_name || row.customer_id || null;
+  if ('notes' in patch) op.notes = orderNotes(row);
+  let warn = '';
+  if (Object.keys(op).length) {
+    const { error: e2 } = await supabase.from('order_entries').update({ ...op, updated_at: now, last_content_at: now, ...BOT }).eq('id', row.source_order_id);
+    if (e2) warn = `⚠️ แก้ในปฏิทินแล้ว แต่ใบออเดอร์ที่ผูกไว้แก้ไม่สำเร็จ (${e2.message})`;
+  }
+  return { row, same: false, warn };
+}
+
 // ── ปุ่มในการ์ด ──
 async function handlePostback(ctx, replyToken, data) {
-  const { client } = ctx;
+  const { client, supabase } = ctx;
   const [, act, t, idx] = data.split(':');
   const p = pending.get(t);
   if (!p) return reply(client, replyToken, 'การ์ดนี้หมดอายุแล้ว (เกิน 2 ชม. หรือบอทเพิ่งรีสตาร์ท) พิมพ์คำสั่งใหม่อีกทีนะคะ');
@@ -343,19 +473,23 @@ async function handlePostback(ctx, replyToken, data) {
     return client.replyMessage({ replyToken, messages: [editCard(job, p.data, t2)] });
   }
   if (act === 'ok') {
-    pending.delete(t);
-    if (DRY_RUN) {
-      if (p.kind === 'new') {
-        const a = p.data;
-        return reply(client, replyToken, `🧪 ทดสอบ — ยังไม่บันทึกลงเว็บ\nถ้าใช้จริง จะเพิ่มในปฏิทินงานติดตั้ง:\n${a.work_type} · ${whenText(a.date, a.time)}\n${a.customer_id || a.customer_real_name || ''}${a.install_zone ? ' · โซน' + a.install_zone : ''}`);
-      }
-      const c = p.data.changes || {}, after = applyEdit(p.job, p.data);
-      const lines = [];
-      const old = toBkk(p.job.appointment_datetime);
-      if ((c.date && c.date !== old.date) || (c.time && c.time !== old.time)) lines.push(`วันนัด → ${whenText(after.date, after.time)}`);
-      for (const [f, label] of EDIT_FIELDS) if (after[f] !== undefined) lines.push(`${label} → ${f === 'notes' && p.data.notes_mode !== 'replace' && p.job.notes ? '(ต่อท้าย) ' + c.notes : after[f]}`);
-      return reply(client, replyToken, `🧪 ทดสอบ — ยังไม่แก้ในเว็บ\nถ้าใช้จริง จะแก้ ${jobLabel(p.job)}\n${lines.join('\n')}`);
+    pending.delete(t);   // ลบก่อนบันทึก — กดยืนยันซ้ำสองทีไม่ได้แถวซ้ำ
+    if (p.kind === 'new') {
+      const a = p.data;
+      const what = `${a.work_type} · ${whenText(a.date, a.time)}\n${a.customer_id || a.customer_real_name || ''}${a.install_zone ? ' · โซน' + a.install_zone : ''}`;
+      if (DRY_RUN) return reply(client, replyToken, `🧪 ทดสอบ — ยังไม่บันทึกลงเว็บ\nถ้าใช้จริง จะเพิ่มในปฏิทินงานติดตั้ง:\n${what}`);
+      const { row, warn } = await saveNew(supabase, a);
+      return reply(client, replyToken, `✅ ลงปฏิทินงานติดตั้งแล้ว ${serialLabel(row.serial_no)}\n${what}${warn ? '\n' + warn : ''}`);
     }
+    const c = p.data.changes || {}, after = applyEdit(p.job, p.data);
+    const lines = [];
+    const old = toBkk(p.job.appointment_datetime);
+    if ((c.date && c.date !== old.date) || (c.time && c.time !== old.time)) lines.push(`วันนัด → ${whenText(after.date, after.time)}`);
+    for (const [f, label] of EDIT_FIELDS) if (after[f] !== undefined) lines.push(`${label} → ${f === 'notes' && p.data.notes_mode !== 'replace' && p.job.notes ? '(ต่อท้าย) ' + c.notes : after[f]}`);
+    if (DRY_RUN) return reply(client, replyToken, `🧪 ทดสอบ — ยังไม่แก้ในเว็บ\nถ้าใช้จริง จะแก้ ${jobLabel(p.job)}\n${lines.join('\n')}`);
+    const { same, warn } = await saveEdit(supabase, p.job, p.data);
+    if (same) return reply(client, replyToken, sameReply(p.job));
+    return reply(client, replyToken, `✅ แก้ในเว็บแล้ว ${jobLabel(p.job)}\n${lines.join('\n')}${warn ? '\n' + warn : ''}`);
   }
 }
 
@@ -390,4 +524,4 @@ async function handleApptPostback(ctx, replyToken, data) {
   return true;
 }
 
-module.exports = { handleApptText, handleApptPostback };
+module.exports = { handleApptText, handleApptPostback, saveNew, saveEdit };
