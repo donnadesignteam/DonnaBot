@@ -8,8 +8,10 @@
 // ตอบด้วย reply ทั้งหมด (ฟรี ไม่กินโควตาข้อความ LINE)
 
 const { calendarMessage } = require('./calendar');
-// ‼️ ยังไม่บันทึกลงเว็บจริง จนกว่าจะตั้ง APPT_DRY_RUN=false ใน Railway (ไม่ตั้ง = ทดสอบเหมือนเดิม)
-const DRY_RUN = process.env.APPT_DRY_RUN !== 'false';
+// ‼️ ชั่วคราว 12ต.ค.69 (user สั่ง): เปิดบันทึกลงเว็บจริงเพื่อลองในกลุ่มทดสอบ — คำสั่งยังใช้ได้เฉพาะ GROUP_TEST (index.js)
+//    ลองเสร็จให้กลับเป็นโหมดทดสอบ: เปลี่ยนค่าตั้งต้นบรรทัดล่างกลับเป็น true (หรือตั้ง APPT_DRY_RUN=true ใน Railway)
+const DRY_RUN_DEFAULT = false;
+const DRY_RUN = process.env.APPT_DRY_RUN ? process.env.APPT_DRY_RUN !== 'false' : DRY_RUN_DEFAULT;
 const TAG = DRY_RUN ? ' (ทดสอบ)' : '';
 
 const ZONES = ['กทม', 'เชียงราย', 'เชียงใหม่'];
