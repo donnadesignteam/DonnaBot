@@ -80,15 +80,19 @@ async function handleEvent(event) {
 
   // กลุ่มช่าง 4 กลุ่ม — อ่านภาพดูเลขออเดอร์
   if ([GROUP_CUT, GROUP_SEW, GROUP_IRON, GROUP_PACK, GROUP_TEST].includes(groupId)) {
+    // กลุ่มทดสอบ (จำลองกลุ่มติดตั้ง): ตอบเฉพาะข้อความที่ขึ้นต้นด้วย # — รูป/ข้อความอื่นเงียบ (user สั่ง 13ต.ค.69)
+    if (groupId === GROUP_TEST) {
+      if (message.type === 'text' && message.text.trim().startsWith('#')) {
+        await handleApptText({ client, anthropic, supabase }, replyToken, message.text.trim(), 'north');
+      }
+      return;
+    }
     if (message.type === 'image') {
       await handleWorkImage(replyToken, message.id, groupId);
       return;
     }
     if (message.type === 'text') {
       const text = message.text.trim();
-      // คำสั่งงานติดตั้ง #นัด/#แก้/#สรุป/#ปฏิทิน — ระยะทดสอบ (12ต.ค.69 ย้ายจากแชทส่วนตัวมากลุ่มทดสอบ ตามที่ user สั่ง)
-      // กลุ่มทดสอบจำลองเป็นกลุ่มติดตั้งเชียงราย+ต่างจังหวัด ('north') · ยังเป็น DRY_RUN ไม่เขียนเว็บ
-      if (groupId === GROUP_TEST && await handleApptText({ client, anthropic, supabase }, replyToken, text, 'north')) return;
       if (text === 'ถูก') {
         await handleFeedbackCorrect(replyToken, groupId);
         return;
