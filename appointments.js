@@ -266,7 +266,8 @@ async function handleNew(ctx, replyToken, text) {
 }
 
 // หางานจากคำค้น (อ่านอย่างเดียว) — งานที่ยังไม่เสร็จ นัดตั้งแต่ 30 วันก่อน หรือยังไม่มีวัน
-async function findJobs(supabase, query, profile) {
+// done: true = หาเฉพาะงานที่ปิดแล้ว (ใช้บอกเหตุผลตอน #แก้ หาไม่เจอ)
+async function findJobs(supabase, query, profile, { done = false } = {}) {
   const since = new Date(Date.now() - 30 * 86400e3).toISOString();
   const { data, error } = await supabase.from('installations')
     .select('id, serial_no, appointment_datetime, work_type, customer_id, customer_real_name, phone, province, location_link, notes, install_zone, installation_status')
@@ -277,7 +278,7 @@ async function findJobs(supabase, query, profile) {
   const q = String(query || '').trim();
   const qd = digits(q), qn = norm(q);
   const serial = (q.match(/^IN\s*0*(\d+)$/i) || [])[1];
-  return (data || []).filter(r => !DONE.includes(r.installation_status))
+  return (data || []).filter(r => DONE.includes(r.installation_status) === done)
     .filter(r => !profile || ['', ...profile.zones].includes(zoneOf(r)))   // เฉพาะโซนของกลุ่มนี้ (+งานที่ยังไม่ระบุโซน)
     .filter(r => {
     if (serial) return String(Number(r.serial_no)) === serial;
@@ -342,6 +343,12 @@ async function handleEdit(ctx, replyToken, text) {
   sanitize(a.changes, text, { edit: true });   // สั่งแก้แค่เวลา → ไม่ให้วัน (ที่ AI เดาเป็นวันนี้) หลุดเข้ามา
   if (!Object.keys(a.changes).length) return reply(client, replyToken, `เจอคำว่า "${a.query}" แต่ไม่รู้ว่าจะแก้อะไร ลองพิมพ์ใหม่ เช่น "#แก้ ${a.query} เป็น 15/10 13.00" หรือ "#แก้ ${a.query} เบอร์ 08xxxxxxxx"`);
   const jobs = await findJobs(supabase, a.query, profile);
+  if (!jobs.length) {
+    // 13ต.ค.69 user ค้น IN0170 ไม่เจอเพราะงานถูกกดเป็น "วัดหน้างานแล้ว" ในเว็บ → บอกเหตุผลตรงๆ ไม่ให้เข้าใจว่าหาชื่อไม่เจอ
+    const closed = await findJobs(supabase, a.query, profile, { done: true });
+    if (closed.length) return reply(client, replyToken, `เจอ ${jobLabel(closed[0])}${closed.length > 1 ? ` และอีก ${closed.length - 1} งาน` : ''} แต่งานนี้ปิดแล้ว (สถานะ "${closed[0].installation_status}")
+บอทแก้ได้เฉพาะงานที่ยังไม่เสร็จ ถ้าจะแก้ให้เปลี่ยนสถานะในเว็บกลับก่อน หรือแก้ในเว็บได้เลยค่ะ`);
+  }
   if (!jobs.length) return reply(client, replyToken, `ไม่เจองานที่ยังไม่เสร็จของ "${a.query}" ในปฏิทินงานติดตั้ง${profile ? ' (ค้นเฉพาะโซน ' + profile.zones.join('/') + ' + งานที่ยังไม่ระบุโซน)' : ''}\nลองค้นด้วยเบอร์ หรือเลข IN แทนได้ค่ะ`);
   if (jobs.length === 1) {
     if (!hasChange(jobs[0], a)) return reply(client, replyToken, sameReply(jobs[0]));
