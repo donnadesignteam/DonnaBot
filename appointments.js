@@ -101,7 +101,7 @@ async function parseItems(text) {
 const itemLine = (it) => {
   const head = [it.fabric_type && /โปร่ง/.test(it.fabric_type) ? 'ผ้าโปร่ง' + (it.type || '') : it.type, it.color_code, it.color_name].filter(Boolean).join(' ');
   const size = [it.width, it.height && Number(it.height) ? it.height : ''].filter(v => v !== '' && v != null && Number(v) !== 0).join('*');
-  const tail = [size, `= ${it.quantity ?? ''} ${it.unit || ''}`.trim(), it.pull_side, it.price ? `฿${Number(it.price).toLocaleString('en-US')}` : ''].filter(Boolean).join(' ');
+  const tail = [size, `= ${it.quantity ?? ''} ${it.unit || ''}`.trim(), it.pull_side, it.weight_chain ? `(${it.weight_chain})` : '', it.price ? `฿${Number(it.price).toLocaleString('en-US')}` : ''].filter(Boolean).join(' ');
   return `${it.room ? '📍' + it.room + ' ' : ''}${head} ${tail}`.trim();
 };
 const itemsText = (items) => items.map(it => '• ' + itemLine(it)).join('\n');
@@ -452,6 +452,70 @@ async function saveItems(supabase, job, items) {
   return '';
 }
 
+// ── #แก้ + รายการสินค้า ── แทนรายการเดิมที่ "ชนิด + กว้าง + สูง" เดียวกัน (เช่นเปลี่ยนสี/โซ่ถ่วง) · ไม่เจอตัวที่ตรง = เพิ่มเป็นรายการใหม่
+const sameSize = (a, b) => String(a.type || '') === String(b.type || '')
+  && Number(a.width || 0) === Number(b.width || 0) && Number(a.height || 0) === Number(b.height || 0);
+function mergeItems(old, items) {
+  const next = [...old], changes = [], used = new Set();
+  for (const it of items) {
+    const i = next.findIndex((o, k) => !used.has(k) && sameSize(o, it));
+    if (i >= 0) {
+      used.add(i);
+      changes.push({ was: next[i], now: it });
+      // ห้อง/สั่งนอก ของเดิมคงไว้ถ้ารายการใหม่ไม่ได้บอก
+      next[i] = { ...it, room: it.room || next[i].room || '', outsource: it.outsource || next[i].outsource || '' };
+    } else { next.push(it); changes.push({ was: null, now: it }); }
+  }
+  return { next, changes };
+}
+const changesText = (changes) => changes.map(c => c.was ? `แก้: ${itemLine(c.was)}\n→ ${itemLine(c.now)}` : `เพิ่ม: ${itemLine(c.now)}`).join('\n\n');
+async function orderItemsOf(supabase, job) {
+  if (!job.source_order_id) return null;
+  const { data, error } = await supabase.from('order_entries').select('items').eq('id', job.source_order_id).maybeSingle();
+  if (error) throw error;
+  return data ? (Array.isArray(data.items) ? data.items : []) : null;
+}
+async function editItemsCard(supabase, job, items) {
+  const old = await orderItemsOf(supabase, job);
+  if (old == null) return { text: `${jobLabel(job)} ไม่มีใบออเดอร์คู่ (แก้รายการได้เฉพาะงานติดตั้ง) — ถ้าจะเพิ่มรายการใช้ #เพิ่มรายการ ค่ะ` };
+  const { changes } = mergeItems(old, items);
+  const t = keep({ kind: 'edititems', job, items });
+  return { msg: card('แก้รายการ' + TAG, [['ใบงาน', jobLabel(job)], ['รายการ', changesText(changes)]],
+    [['ยืนยัน', `appt:ok:${t}`, 'primary'], ['ยกเลิก', `appt:edit:${t}`]], C.dark) };
+}
+async function handleEditItems(ctx, replyToken, text) {
+  const { client, supabase, profile } = ctx;
+  const [first, ...rest] = text.split('\n');
+  const body = rest.join('\n').trim();
+  const query = first.replace(/^\s*(line\s*-?\s*oa|ไลน์\s*โอเอ|facebook|fb|เฟส\S*|tiktok\S*|shopee\S*|ช้อปปี้)\s*[:：]?\s*/i, '').trim();
+  if (!query || !body) return reply(client, replyToken, 'แก้รายการ: พิมพ์ #แก้ ตามด้วยชื่อลูกค้าในบรรทัดแรก แล้วขึ้นบรรทัดใหม่ใส่รายการที่แก้ (ชนิดและขนาดเดียวกับของเดิม) เช่น\n#แก้ Line OA : Test\nม่านลอนเทป\nS01 ครีมมินิมอล\n1.84*2.78 = 2ผืน (ใส่โซ่ถ่วง)');
+  const [jobs, items] = await Promise.all([findJobs(supabase, query, profile), parseItems(body)]);
+  if (!items.length) return reply(client, replyToken, 'อ่านรายการสินค้าไม่ออก ลองพิมพ์ใหม่อีกทีนะคะ');
+  if (!jobs.length) return reply(client, replyToken, `ไม่เจองานที่ยังไม่เสร็จของ "${query}" ในปฏิทินงานติดตั้ง\nลองค้นด้วยเบอร์ หรือเลข IN แทนได้ค่ะ`);
+  if (jobs.length === 1) {
+    const r = await editItemsCard(supabase, jobs[0], items);
+    return r.msg ? client.replyMessage({ replyToken, messages: [r.msg] }) : reply(client, replyToken, r.text);
+  }
+  const t = keep({ kind: 'pickedititems', jobs: jobs.slice(0, 4), items });
+  const msg = card(`เจอ ${jobs.length} งาน — เลือกงานที่จะแก้รายการ`, [['ค้นด้วย', query], ['รายการ', itemsText(items)]], [], C.dark);
+  msg.contents.footer = { type: 'box', layout: 'vertical', spacing: 'sm', backgroundColor: C.surface, paddingAll: '12px',
+    contents: jobs.slice(0, 4).map((j, i) => btn(shortLabel(j), `appt:pick:${t}:${i}`, '', jobLabel(j))) };
+  return client.replyMessage({ replyToken, messages: [msg] });
+}
+// บันทึก: อ่านรายการล่าสุดก่อน (เว็บอาจแก้ไประหว่างรอ) แล้วจับคู่ใหม่
+async function saveEditItems(supabase, job, items) {
+  const { data: cur, error } = await supabase.from('installations').select('source_order_id').eq('id', job.id).maybeSingle();
+  if (error) throw error;
+  if (!cur || !cur.source_order_id) throw new Error('งานนี้ไม่มีใบออเดอร์คู่แล้ว');
+  const old = await orderItemsOf(supabase, cur);
+  if (old == null) throw new Error('ไม่เจอใบออเดอร์ที่ผูกกับงานนี้');
+  const { next, changes } = mergeItems(old, items);
+  const now = new Date().toISOString();
+  const { error: e2 } = await supabase.from('order_entries').update({ items: next, updated_at: now, last_content_at: now, ...BOT }).eq('id', cur.source_order_id);
+  if (e2) throw e2;
+  return changes;
+}
+
 // ── #สรุป ── (อ่านอย่างเดียว · หน้าตาเหมือนโพสต์ "🔥อัพเดตงานติดตั้ง" ของทีม)
 async function handleSummary(ctx, replyToken, text) {
   const { client, supabase, profile } = ctx;
@@ -667,6 +731,7 @@ async function handlePostback(ctx, replyToken, data) {
     pending.delete(t);
     return reply(client, replyToken, p.kind === 'new'
       ? 'ยกเลิกการ์ดนี้แล้ว พิมพ์ #นัด ใหม่พร้อมข้อมูลที่ถูกต้องได้เลยค่ะ'
+      : /edititems/.test(p.kind) ? 'ยกเลิกการ์ดนี้แล้ว พิมพ์ #แก้ ใหม่ได้เลยค่ะ'
       : /items/.test(p.kind) ? 'ยกเลิกการ์ดนี้แล้ว พิมพ์ #เพิ่มรายการ ใหม่ได้เลยค่ะ'
       : 'ยกเลิกการ์ดนี้แล้ว พิมพ์ #แก้ ใหม่ได้เลยค่ะ');
   }
@@ -674,6 +739,10 @@ async function handlePostback(ctx, replyToken, data) {
     const job = p.jobs[Number(idx)];
     if (!job) return reply(client, replyToken, 'ไม่เจองานที่เลือก ลองพิมพ์ #แก้ ใหม่นะคะ');
     pending.delete(t);
+    if (p.kind === 'pickedititems') {
+      const r = await editItemsCard(supabase, job, p.items);
+      return r.msg ? send(r.msg) : reply(client, replyToken, r.text);
+    }
     if (p.kind === 'pickitems') {
       const t2 = keep({ kind: 'items', job, items: p.items });
       return client.replyMessage({ replyToken, messages: [addItemsCard(job, p.items, t2)] });
@@ -684,6 +753,11 @@ async function handlePostback(ctx, replyToken, data) {
   }
   if (act === 'ok') {
     pending.delete(t);   // ลบก่อนบันทึก — กดยืนยันซ้ำสองทีไม่ได้แถวซ้ำ
+    if (p.kind === 'edititems') {
+      if (DRY_RUN) return send(card('ทดสอบ · ยังไม่แก้ในเว็บ', [['ใบงาน', jobLabel(p.job)], ['รายการ', itemsText(p.items)]], webBtn(p.job.id), C.mute));
+      const changes = await saveEditItems(supabase, p.job, p.items);
+      return send(card('แก้รายการในเว็บแล้ว', [['ใบงาน', jobLabel(p.job)], ['รายการ', changesText(changes)]], webBtn(p.job.id), C.done));
+    }
     if (p.kind === 'items') {
       const what = [['ใบงาน', jobLabel(p.job)], ['เพิ่ม', itemsText(p.items)]];
       if (DRY_RUN) return send(card('ทดสอบ · ยังไม่เพิ่มในเว็บ', [['ถ้าใช้จริง', 'จะต่อท้ายรายการในใบออเดอร์'], ...what], webBtn(p.job.id), C.mute));
@@ -722,6 +796,7 @@ async function handleApptText(ctx, replyToken, text, profileKey) {
   try {
     if (m[1] === 'นัด') await handleNew(ctx, replyToken, m[2].trim());
     else if (m[1] === 'เพิ่มรายการ') await handleAddItems(ctx, replyToken, m[2].trim());
+    else if ((m[1] === 'แก้' || m[1] === 'เลื่อน') && hasItems(m[2])) await handleEditItems(ctx, replyToken, m[2].trim());   // มีรายการสินค้า = แก้รายการ
     else if (m[1] === 'แก้' || m[1] === 'เลื่อน') await handleEdit(ctx, replyToken, m[2].trim());   // #เลื่อน = ชื่อเดิม ทำงานเหมือน #แก้
     else if (m[1] === 'ปฏิทิน') await handleCalendar(ctx, replyToken, m[2].trim());
     else await handleSummary(ctx, replyToken, m[2].trim());
