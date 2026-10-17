@@ -590,11 +590,12 @@ async function handleSummary(ctx, replyToken, text) {
 
 // รูปปฏิทินของเดือน (offset 0 = เดือนนี้, 1 = เดือนหน้า) ตามโซนที่พิมพ์ / โซนของกลุ่ม
 async function monthImage(ctx, zone, offset) {
-  const { supabase, profile } = ctx;
+  const { supabase } = ctx;
   const [y, m] = bkkToday().split('-').map(Number);
   const d = new Date(Date.UTC(y, m - 1 + offset, 1));
-  const zones = zone ? [zone] : profile ? profile.zones : null;
-  const title = zone ? '#' + zone : profile ? profile.label : 'ทุกโซน';
+  // #ปฏิทิน เฉยๆ = รวมทุกโซน · #ปฏิทินเชียงราย / #ปฏิทินเชียงใหม่ / #ปฏิทินกทม = โซนนั้น (แบบเดียวกับ #สรุป — 17ต.ค.69 ไม่ยึดโซนของกลุ่มแล้ว)
+  const zones = zone ? [zone] : null;
+  const title = zone ? '#' + zone : 'ทุกโซน';
   return calendarMessage({ supabase, year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, zones, title, zoneOf, today: bkkToday() });
 }
 
