@@ -367,6 +367,9 @@ function applyEdit(job, a) {
   for (const [f] of EDIT_FIELDS) {
     if (c[f] == null || c[f] === '') continue;
     if (String(c[f]).trim() === String(job[f] || '').trim()) continue;   // เหมือนของเดิม = ไม่ต้องแก้
+    // หมายเหตุแบบต่อท้าย: ข้อความนี้มีอยู่ในหมายเหตุเดิมแล้ว (เว้นวรรค/เครื่องหมายต่างกันก็นับ) = ไม่เติมซ้ำ
+    // (15ต.ค.69 พิมพ์ #แก้ ซ้ำ 2 รอบ หมายเหตุ prapapun ขึ้นบรรทัดซ้ำ)
+    if (f === 'notes' && a.notes_mode !== 'replace' && norm(c.notes) && norm(job.notes).includes(norm(c.notes))) continue;
     after[f] = f === 'notes' && a.notes_mode !== 'replace' && job.notes ? `${job.notes}\n${c.notes}` : c[f];
   }
   return after;
