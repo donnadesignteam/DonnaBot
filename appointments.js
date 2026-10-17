@@ -1,5 +1,6 @@
 // ── ลงนัดติดตั้ง/วัดหน้างานผ่านแชท LINE ─────────────────────────────
-// คำสั่ง: #นัด <ข้อความนัดแบบที่ทีมโพสต์ในกลุ่ม> · #แก้ <ลูกค้า> <วันเวลาใหม่/ช่องที่แก้> (#เลื่อน ใช้แทนกันได้) · #สรุป [โซน] · #ปฏิทิน [โซน] [เดือน]
+// คำสั่ง: #นัด <ข้อความนัดแบบที่ทีมโพสต์ในกลุ่ม (มีรายการสินค้าต่อท้ายได้)> · #แก้ <ลูกค้า> <วันเวลาใหม่/ช่องที่แก้> (#เลื่อน ใช้แทนกันได้)
+//        · #เพิ่มรายการ <ลูกค้า> + รายการสินค้า · #สรุป (ทุกโซน) / #สรุปกทม / #สรุปเชียงใหม่ / #สรุปเชียงราย · #ปฏิทิน [โซน] [เดือน]
 // ระยะทดสอบ: ใช้ในกลุ่มทดสอบ (GROUP_TEST ใน index.js — 12ต.ค.69 ย้ายจากแชทส่วนตัว) และ **ไม่เขียนตาราง installations** (DRY_RUN)
 //   · #นัด / #เลื่อน → AI อ่านข้อความ → การ์ดยืนยัน → กด ✅ แค่ตอบว่า "ถ้าใช้จริงจะบันทึกอะไร"
 //   · #สรุป / การหางานของ #เลื่อน = อ่านตาราง installations จริง (อ่านอย่างเดียว)
@@ -7,6 +8,7 @@
 //   (เลข IN จากตัวนับกลาง · งานติดตั้งสร้างใบออเดอร์คู่ให้ · แก้แล้ว sync ไปใบออเดอร์ที่ผูกไว้)
 // ตอบด้วย reply ทั้งหมด (ฟรี ไม่กินโควตาข้อความ LINE)
 
+const crypto = require('crypto');
 const { calendarMessage } = require('./calendar');
 // ‼️ ชั่วคราว 12ต.ค.69 (user สั่ง): เปิดบันทึกลงเว็บจริงเพื่อลองในกลุ่มทดสอบ — คำสั่งยังใช้ได้เฉพาะ GROUP_TEST (index.js)
 //    ลองเสร็จให้กลับเป็นโหมดทดสอบ: เปลี่ยนค่าตั้งต้นบรรทัดล่างกลับเป็น true (หรือตั้ง APPT_DRY_RUN=true ใน Railway)
@@ -73,6 +75,36 @@ async function askJson(anthropic, system, text) {
   return m ? JSON.parse(m[0]) : null;
 }
 
+// ── แปลงรายการสินค้าด้วยตัวเดียวกับเว็บ ── (donnaweb /api/parse-items · กติกาอยู่ที่ lib/itemPrompt.ts ของเว็บที่เดียว)
+// เว็บล็อกด้วย cookie donna_auth = sha256("<SITE_USER>:<SITE_PASS>:donna-erp-v1") (lib/auth.ts ของเว็บ) → ตั้ง SITE_PASS (+SITE_USER) ใน Railway ให้ตรงกับ Vercel
+const webCookie = () => {
+  const pass = process.env.SITE_PASS;
+  if (!pass) return '';
+  const tok = crypto.createHash('sha256').update(`${process.env.SITE_USER || 'donna'}:${pass}:donna-erp-v1`).digest('hex');
+  return `donna_auth=${tok}`;
+};
+// ข้อความมีรายการสินค้าไหม — มีขนาด ก*ส (1.84*2.78) หรือ "= 2 ผืน/ชุด/เส้น/ชิ้น"
+const hasItems = (text) => /\d\s*[*xX×]\s*[ส]?\s*\d|=\s*\d+\s*(ผืน|ชุด|เส้น|ชิ้น|ตัว|ม้วน|อัน)/.test(noUrl(text));
+async function parseItems(text) {
+  const res = await fetch(`${WEB_URL}/api/parse-items`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: webCookie() },
+    body: JSON.stringify({ text }),
+  });
+  if (res.status === 401) throw new Error('บอทเข้าเว็บไม่ได้ — ต้องตั้ง SITE_PASS ใน Railway ให้ตรงกับรหัสเว็บ');
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok || !Array.isArray(j.items)) throw new Error(j.error || `แปลงรายการไม่สำเร็จ (${res.status})`);
+  return j.items;
+}
+// รายการ 1 ชิ้น → บรรทัดสั้นในการ์ด เช่น "ม่านลอนเทป S581 ขาวครีม 1.84*2.78 = 2 ผืน ฿3,681"
+const itemLine = (it) => {
+  const head = [it.fabric_type && /โปร่ง/.test(it.fabric_type) ? 'ผ้าโปร่ง' + (it.type || '') : it.type, it.color_code, it.color_name].filter(Boolean).join(' ');
+  const size = [it.width, it.height && Number(it.height) ? it.height : ''].filter(v => v !== '' && v != null && Number(v) !== 0).join('*');
+  const tail = [size, `= ${it.quantity ?? ''} ${it.unit || ''}`.trim(), it.pull_side, it.price ? `฿${Number(it.price).toLocaleString('en-US')}` : ''].filter(Boolean).join(' ');
+  return `${it.room ? '📍' + it.room + ' ' : ''}${head} ${tail}`.trim();
+};
+const itemsText = (items) => items.map(it => '• ' + itemLine(it)).join('\n');
+
 const NEW_SYSTEM = () => `คุณอ่านข้อความนัดงานติดตั้งผ้าม่านที่แอดมินร้าน Donna Design พิมพ์ แล้วตอบเป็น JSON อย่างเดียว ห้ามมีคำอื่น
 วันนี้คือ ${bkkToday()} (ปี ค.ศ. · ถ้าเขียนปี พ.ศ. เช่น 2569 ให้ลบ 543 · ถ้าไม่ระบุปีให้ใช้วันที่ที่ใกล้วันนี้ที่สุดที่ยังไม่ผ่านไป)
 รูปแบบ:
@@ -87,6 +119,7 @@ const NEW_SYSTEM = () => `คุณอ่านข้อความนัดง
 ‼️ address = ที่อยู่ตามที่พิมพ์ ตั้งแต่บ้านเลขที่ถึงรหัสไปรษณีย์ ไม่ตัดเลขหน้าออก ไม่สลับลำดับ
 ‼️ customer_real_name ใส่เฉพาะเมื่อข้อความมีชื่อจริงแยกต่างหากจากชื่อไลน์ ห้ามคัดลอกจาก customer_id
 ‼️ notes = สิ่งที่ต้องไปทำ/วัด/ติดตั้ง ตามที่พิมพ์ (เช่น "วัดมุ้งจีบ") และรายละเอียดอื่น · ห้ามใส่วัน เวลา ชื่อ เบอร์ ที่อยู่ซ้ำลงใน notes
+‼️ รายการสินค้าที่มีขนาด/จำนวน (เช่น "ม่านลอนเทป S581 1.84*2.78 = 2ผืน ฿3,681") ไม่ต้องใส่ใน notes — ระบบแปลงรายการแยกเอง
 ‼️ ถ้าข้อความไม่ได้บอกวัน (ไม่มีวันที่ ไม่มีชื่อวัน ไม่มีคำว่า วันนี้/พรุ่งนี้) ให้ date เป็น '' และใส่ "วัน" ใน missing — ห้ามเดาเป็นวันนี้ แม้จะมีเวลาบอกมาก็ตาม
 install_zone: กรุงเทพ/ปริมณฑล/นนทบุรี/สมุทรปราการ = กทม · เชียงราย = เชียงราย · เชียงใหม่ = เชียงใหม่ · จังหวัดอื่นในภาคเหนือ (ลำปาง พะเยา ฯลฯ) = เชียงราย · ไม่รู้ = ''`;
 
@@ -234,8 +267,12 @@ function sanitize(f, text, { edit = false } = {}) {
 async function handleNew(ctx, replyToken, text) {
   const { client, anthropic, profile } = ctx;
   if (!text) return reply(client, replyToken, 'พิมพ์ #นัด ตามด้วยรายละเอียดนัด เช่น\n#นัด ติดตั้ง ศุกร์ 9/10 10.00\nLineOA: Att 0900381117\nคอนโด notting hill ห้อง 1/123\nhttps://maps.app.goo.gl/...');
-  const a = await askJson(anthropic, NEW_SYSTEM(), text);
+  // มีรายการสินค้าในข้อความ → แปลงด้วยตัวเดียวกับเว็บไปพร้อมกัน (ไม่มี = ไม่เรียก ประหยัดค่า AI)
+  const itemsP = hasItems(text) ? parseItems(text).catch(err => ({ error: err.message || String(err) })) : Promise.resolve([]);
+  const [a, parsed] = await Promise.all([askJson(anthropic, NEW_SYSTEM(), text), itemsP]);
   if (!a) return reply(client, replyToken, 'อ่านข้อความไม่ออก ลองพิมพ์ใหม่อีกทีนะคะ');
+  a.items = Array.isArray(parsed) ? parsed : [];
+  const itemErr = Array.isArray(parsed) ? '' : parsed.error;
   // AI ชอบเดาวันเป็น "วันนี้" ตอนข้อความมีแต่เวลา (12ต.ค.69 user ลองแล้วเจอ) → ข้อความไม่มีอะไรบอกวันเลย = ล้างวันทิ้ง ให้ขึ้น "ยังไม่มีวัน"
   const dropped = sanitize(a, text);
   a.missing = [...(a.missing || []), ...dropped, ...(a.date ? [] : ['date']), ...(a.time ? [] : ['time'])];
@@ -259,7 +296,10 @@ async function handleNew(ctx, replyToken, text) {
   const rows = [
     ['งาน', a.work_type], ['ช่องทาง', a.platform], ['วันนัด', whenText(a.date, a.time) + (past ? ' · วันนี้ผ่านไปแล้ว' : ''), past ? 'warn' : whenTone(a.date)], ['ลูกค้า', a.customer_id], ['ชื่อจริง', a.customer_real_name],
     ['เบอร์', a.phone], ['ที่อยู่', a.address], ['แผนที่', a.location_link], a.install_zone ? ['โซน', a.install_zone + zoneNote] : ['โซน', 'ไม่รู้โซน', 'warn'],
-    ['หมายเหตุ', a.notes], ['ยังขาด', missing.length ? missing.join(', ') : '', 'warn'], ['มีงานเดิม', dup, 'warn'],
+    ['หมายเหตุ', a.notes], ['รายการ', a.items.length ? itemsText(a.items) : ''],
+    ['รายการ', itemErr ? 'แปลงรายการไม่สำเร็จ: ' + itemErr : '', 'warn'],
+    ['รายการ', a.items.length && a.work_type !== 'งานติดตั้ง' ? 'รายการจะบันทึกเฉพาะงานติดตั้ง (ลงในใบออเดอร์คู่)' : '', 'warn'],
+    ['ยังขาด', missing.length ? missing.join(', ') : '', 'warn'], ['มีงานเดิม', dup, 'warn'],
   ];
   await client.replyMessage({ replyToken, messages: [card('ลงนัดใหม่' + TAG, rows,
     [['ยืนยัน', `appt:ok:${t}`, 'primary'], ['แก้', `appt:edit:${t}`]])] });
@@ -270,7 +310,7 @@ async function handleNew(ctx, replyToken, text) {
 async function findJobs(supabase, query, profile, { done = false } = {}) {
   const since = new Date(Date.now() - 30 * 86400e3).toISOString();
   const { data, error } = await supabase.from('installations')
-    .select('id, serial_no, appointment_datetime, work_type, customer_id, customer_real_name, phone, province, location_link, notes, install_zone, installation_status')
+    .select('id, serial_no, appointment_datetime, work_type, customer_id, customer_real_name, phone, province, location_link, notes, install_zone, installation_status, source_order_id, platform, price, entered_by')
     .or(`appointment_datetime.gte.${since},appointment_datetime.is.null`)
     .order('appointment_datetime', { ascending: true, nullsFirst: false })
     .limit(800);
@@ -364,6 +404,53 @@ async function handleEdit(ctx, replyToken, text) {
   return client.replyMessage({ replyToken, messages: [msg] });
 }
 
+// ── #เพิ่มรายการ ── บรรทัดแรก = ลูกค้า (ชื่อไลน์/ชื่อจริง/เบอร์/เลข IN) · บรรทัดถัดไป = รายการสินค้า (แปลงด้วยตัวเดียวกับเว็บ)
+// ต่อท้ายรายการในใบออเดอร์คู่ของงานติดตั้งนั้น (ไม่ทับรายการเดิม)
+function addItemsCard(job, items, t) {
+  return card('เพิ่มรายการ' + TAG, [['ใบงาน', jobLabel(job)], ['เพิ่ม', itemsText(items)],
+    ['ต้องดู', job.work_type !== 'งานติดตั้ง' ? `งานนี้เป็น${job.work_type || 'งานอื่น'} ไม่มีใบออเดอร์ — เพิ่มรายการได้เฉพาะงานติดตั้ง` : '', 'warn']],
+    job.work_type === 'งานติดตั้ง' ? [['ยืนยัน', `appt:ok:${t}`, 'primary'], ['ยกเลิก', `appt:edit:${t}`]] : [['ยกเลิก', `appt:edit:${t}`]], C.dark);
+}
+async function handleAddItems(ctx, replyToken, text) {
+  const { client, supabase, profile } = ctx;
+  const [first, ...rest] = text.split('\n');
+  const body = rest.join('\n').trim();
+  // "Line OA : Test" → "Test" (คำบอกช่องทางไม่ใช่ชื่อ)
+  const query = first.replace(/^\s*(line\s*-?\s*oa|ไลน์\s*โอเอ|facebook|fb|เฟส\S*|tiktok\S*|shopee\S*|ช้อปปี้)\s*[:：]?\s*/i, '').trim();
+  if (!query || !body) return reply(client, replyToken, 'พิมพ์ #เพิ่มรายการ ตามด้วยชื่อลูกค้าในบรรทัดแรก แล้วขึ้นบรรทัดใหม่ใส่รายการ เช่น\n#เพิ่มรายการ Line OA : Test\nม่านลอนเทป\nS581 ขาวครีม\n1.84*2.78 = 2ผืน ฿3,681');
+  const [jobs, items] = await Promise.all([findJobs(supabase, query, profile), parseItems(body)]);
+  if (!items.length) return reply(client, replyToken, 'อ่านรายการสินค้าไม่ออก ลองพิมพ์ใหม่อีกทีนะคะ');
+  if (!jobs.length) return reply(client, replyToken, `ไม่เจองานที่ยังไม่เสร็จของ "${query}" ในปฏิทินงานติดตั้ง\nลองค้นด้วยเบอร์ หรือเลข IN แทนได้ค่ะ`);
+  if (jobs.length === 1) {
+    const t = keep({ kind: 'items', job: jobs[0], items });
+    return client.replyMessage({ replyToken, messages: [addItemsCard(jobs[0], items, t)] });
+  }
+  const t = keep({ kind: 'pickitems', jobs: jobs.slice(0, 4), items });
+  const msg = card(`เจอ ${jobs.length} งาน — เลือกงานที่จะเพิ่มรายการ`, [['ค้นด้วย', query], ['เพิ่ม', itemsText(items)]], [], C.dark);
+  msg.contents.footer = { type: 'box', layout: 'vertical', spacing: 'sm', backgroundColor: C.surface, paddingAll: '12px',
+    contents: jobs.slice(0, 4).map((j, i) => btn(shortLabel(j), `appt:pick:${t}:${i}`, '', jobLabel(j))) };
+  return client.replyMessage({ replyToken, messages: [msg] });
+}
+// บันทึก: ต่อท้าย items ของใบออเดอร์คู่ (อ่านล่าสุดก่อน เผื่อเว็บแก้ไประหว่างรอกดยืนยัน) · ยังไม่มีใบคู่ = สร้างให้พร้อมรายการ
+async function saveItems(supabase, job, items) {
+  const { data: cur, error } = await supabase.from('installations').select('*').eq('id', job.id).maybeSingle();
+  if (error) throw error;
+  if (!cur) throw new Error('งานนี้ถูกลบออกจากเว็บไปแล้ว');
+  if (!cur.source_order_id) {
+    const warn = await linkOrder(supabase, cur, items);
+    if (warn) throw new Error(warn);
+    return '';
+  }
+  const { data: o, error: e1 } = await supabase.from('order_entries').select('items').eq('id', cur.source_order_id).maybeSingle();
+  if (e1) throw e1;
+  if (!o) throw new Error('ไม่เจอใบออเดอร์ที่ผูกกับงานนี้');
+  const now = new Date().toISOString();
+  const next = [...(Array.isArray(o.items) ? o.items : []), ...items];
+  const { error: e2 } = await supabase.from('order_entries').update({ items: next, updated_at: now, last_content_at: now, ...BOT }).eq('id', cur.source_order_id);
+  if (e2) throw e2;
+  return '';
+}
+
 // ── #สรุป ── (อ่านอย่างเดียว · หน้าตาเหมือนโพสต์ "🔥อัพเดตงานติดตั้ง" ของทีม)
 async function handleSummary(ctx, replyToken, text) {
   const { client, supabase, profile } = ctx;
@@ -376,10 +463,10 @@ async function handleSummary(ctx, replyToken, text) {
   const [{ data: up, error: e1 }, { data: wait, error: e2 }] = await Promise.all([q1, q2]);
   if (e1 || e2) throw e1 || e2;
 
-  // ส่วนที่จะโชว์: พิมพ์โซนมาเอง = โซนนั้น · ไม่พิมพ์ = โซนของกลุ่มนี้รวมกัน (ไม่มีกลุ่ม = แยกทุกโซน) · ต่อท้ายงานที่ยังไม่ระบุโซนเสมอ
+  // ส่วนที่จะโชว์: #สรุปกทม / #สรุปเชียงใหม่ / #สรุปเชียงราย = โซนนั้น · #สรุป เฉยๆ = ทุกโซน แยกหัวข้อโซนละส่วน (user สั่ง 17ต.ค.69 ไม่ยึดโซนของกลุ่มแล้ว)
+  // ต่อท้ายงานที่ยังไม่ระบุโซนเสมอ
   const UNKNOWN = { title: '❓ยังไม่ระบุโซนในเว็บ (ไปใส่โซนในปฏิทินงานติดตั้งด้วย)', zones: [''] };
   const sections = zone ? [{ title: '#' + zone, zones: [zone] }, UNKNOWN]
-    : profile ? [{ title: profile.label, zones: profile.zones }, UNKNOWN]
     : [...ZONES.map(z => ({ title: '#' + z, zones: [z] })), UNKNOWN];
   const parts = [];
   for (const sec of sections) {
@@ -475,7 +562,7 @@ async function nextSerial(supabase) {
 }
 
 // งานติดตั้งต้องมีใบออเดอร์คู่ ฝ่ายผลิตถึงจะเห็นในหมวดออเดอร์ → สร้างแล้วผูกด้วย source_order_id (คืนข้อความเตือนถ้าไม่สำเร็จ)
-async function linkOrder(supabase, ins) {
+async function linkOrder(supabase, ins, items = []) {
   if (ins.work_type !== 'งานติดตั้ง' || ins.source_order_id) return '';
   const now = new Date().toISOString();
   const { data, error } = await supabase.from('order_entries').insert({
@@ -488,6 +575,7 @@ async function linkOrder(supabase, ins) {
     phone: ins.phone || null,
     location_link: ins.location_link || null,
     notes: orderNotes(ins),
+    items: items && items.length ? items : null,   // รายการที่แปลงมาจาก #นัด / #เพิ่มรายการ
     price: ins.price ?? null,
     payment_status: 'ยังไม่ชำระ',
     order_status: 'รอดำเนินการ',
@@ -531,7 +619,7 @@ async function saveNew(supabase, a) {
     ...BOT,
   }).select().single();
   if (error) throw error;
-  return { row, warn: await linkOrder(supabase, row) };
+  return { row, warn: await linkOrder(supabase, row, a.items) };
 }
 
 // #แก้ → แก้เฉพาะช่องที่สั่ง (อ่านแถวล่าสุดก่อน เผื่อเว็บแก้ไประหว่างรอกดยืนยัน) แล้ว sync ช่องเดียวกันไปใบออเดอร์ที่ผูกไว้
@@ -578,21 +666,33 @@ async function handlePostback(ctx, replyToken, data) {
     pending.delete(t);
     return reply(client, replyToken, p.kind === 'new'
       ? 'ยกเลิกการ์ดนี้แล้ว พิมพ์ #นัด ใหม่พร้อมข้อมูลที่ถูกต้องได้เลยค่ะ'
+      : /items/.test(p.kind) ? 'ยกเลิกการ์ดนี้แล้ว พิมพ์ #เพิ่มรายการ ใหม่ได้เลยค่ะ'
       : 'ยกเลิกการ์ดนี้แล้ว พิมพ์ #แก้ ใหม่ได้เลยค่ะ');
   }
   if (act === 'pick') {
     const job = p.jobs[Number(idx)];
     if (!job) return reply(client, replyToken, 'ไม่เจองานที่เลือก ลองพิมพ์ #แก้ ใหม่นะคะ');
     pending.delete(t);
+    if (p.kind === 'pickitems') {
+      const t2 = keep({ kind: 'items', job, items: p.items });
+      return client.replyMessage({ replyToken, messages: [addItemsCard(job, p.items, t2)] });
+    }
     if (!hasChange(job, p.data)) return reply(client, replyToken, sameReply(job));
     const t2 = keep({ kind: 'edit', job, data: p.data });
     return client.replyMessage({ replyToken, messages: [editCard(job, p.data, t2)] });
   }
   if (act === 'ok') {
     pending.delete(t);   // ลบก่อนบันทึก — กดยืนยันซ้ำสองทีไม่ได้แถวซ้ำ
+    if (p.kind === 'items') {
+      const what = [['ใบงาน', jobLabel(p.job)], ['เพิ่ม', itemsText(p.items)]];
+      if (DRY_RUN) return send(card('ทดสอบ · ยังไม่เพิ่มในเว็บ', [['ถ้าใช้จริง', 'จะต่อท้ายรายการในใบออเดอร์'], ...what], webBtn(p.job.id), C.mute));
+      await saveItems(supabase, p.job, p.items);
+      return send(card('เพิ่มรายการในเว็บแล้ว', what, webBtn(p.job.id), C.done));
+    }
     if (p.kind === 'new') {
       const a = p.data;
-      const what = [['งาน', a.work_type], ['ช่องทาง', a.platform], ['วันนัด', whenText(a.date, a.time), whenTone(a.date)], ['ลูกค้า', a.customer_id || a.customer_real_name], ['โซน', a.install_zone]];
+      const what = [['งาน', a.work_type], ['ช่องทาง', a.platform], ['วันนัด', whenText(a.date, a.time), whenTone(a.date)], ['ลูกค้า', a.customer_id || a.customer_real_name], ['โซน', a.install_zone],
+        ['รายการ', a.items && a.items.length && a.work_type === 'งานติดตั้ง' ? `${a.items.length} รายการ` : '']];
       if (DRY_RUN) return send(card('ทดสอบ · ยังไม่บันทึกลงเว็บ', [['ถ้าใช้จริง', 'จะเพิ่มในปฏิทินงานติดตั้ง'], ...what], [], C.mute));
       const { row, warn } = await saveNew(supabase, a);
       return send(card('ลงปฏิทินงานติดตั้งแล้ว', [['ใบงาน', serialLabel(row.serial_no)], ...what, ['ต้องดู', warn, 'warn']], webBtn(row.id), C.done));
@@ -616,10 +716,11 @@ async function reply(client, replyToken, text) {
 // ข้อความขึ้นต้นด้วยคำสั่งไหม → จัดการแล้วคืน true
 async function handleApptText(ctx, replyToken, text, profileKey) {
   ctx = { ...ctx, profile: PROFILES[profileKey] || null };
-  const m = text.match(/^#\s*(นัด|แก้|เลื่อน|สรุป|ปฏิทิน)\s*([\s\S]*)$/);
+  const m = text.match(/^#\s*(เพิ่มรายการ|นัด|แก้|เลื่อน|สรุป|ปฏิทิน)\s*([\s\S]*)$/);
   if (!m) return false;
   try {
     if (m[1] === 'นัด') await handleNew(ctx, replyToken, m[2].trim());
+    else if (m[1] === 'เพิ่มรายการ') await handleAddItems(ctx, replyToken, m[2].trim());
     else if (m[1] === 'แก้' || m[1] === 'เลื่อน') await handleEdit(ctx, replyToken, m[2].trim());   // #เลื่อน = ชื่อเดิม ทำงานเหมือน #แก้
     else if (m[1] === 'ปฏิทิน') await handleCalendar(ctx, replyToken, m[2].trim());
     else await handleSummary(ctx, replyToken, m[2].trim());
