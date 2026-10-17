@@ -76,7 +76,8 @@ async function askJson(anthropic, system, text) {
 }
 
 // ── แปลงรายการสินค้าด้วยตัวเดียวกับเว็บ ── (donnaweb /api/parse-items · กติกาอยู่ที่ lib/itemPrompt.ts ของเว็บที่เดียว)
-// เว็บล็อกด้วย cookie donna_auth = sha256("<SITE_USER>:<SITE_PASS>:donna-erp-v1") (lib/auth.ts ของเว็บ) → ตั้ง SITE_PASS (+SITE_USER) ใน Railway ให้ตรงกับ Vercel
+// เข้าเว็บด้วยกุญแจบอท: header x-bot-key = env BOT_API_KEY (ตั้งค่าเดียวกันทั้ง Railway + Vercel · proxy.ts ของเว็บเปิดให้เฉพาะ /api/parse-items)
+// สำรอง: cookie donna_auth จาก SITE_PASS (+SITE_USER) แบบเดียวกับ lib/auth.ts ของเว็บ
 const webCookie = () => {
   const pass = process.env.SITE_PASS;
   if (!pass) return '';
@@ -88,10 +89,10 @@ const hasItems = (text) => /\d\s*[*xX×]\s*[ส]?\s*\d|=\s*\d+\s*(ผืน|ช�
 async function parseItems(text) {
   const res = await fetch(`${WEB_URL}/api/parse-items`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Cookie: webCookie() },
+    headers: { 'Content-Type': 'application/json', 'x-bot-key': process.env.BOT_API_KEY || '', Cookie: webCookie() },
     body: JSON.stringify({ text }),
   });
-  if (res.status === 401) throw new Error('บอทเข้าเว็บไม่ได้ — ต้องตั้ง SITE_PASS ใน Railway ให้ตรงกับรหัสเว็บ');
+  if (res.status === 401) throw new Error('บอทเข้าเว็บไม่ได้ — ต้องตั้ง BOT_API_KEY ค่าเดียวกันทั้งใน Railway และ Vercel (แล้ว Redeploy เว็บ)');
   const j = await res.json().catch(() => ({}));
   if (!res.ok || !Array.isArray(j.items)) throw new Error(j.error || `แปลงรายการไม่สำเร็จ (${res.status})`);
   return j.items;
