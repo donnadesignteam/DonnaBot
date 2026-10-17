@@ -104,7 +104,25 @@ const itemLine = (it) => {
   const tail = [size, `= ${it.quantity ?? ''} ${it.unit || ''}`.trim(), it.pull_side, it.weight_chain ? `(${it.weight_chain})` : '', it.price ? `฿${Number(it.price).toLocaleString('en-US')}` : ''].filter(Boolean).join(' ');
   return `${it.room ? '📍' + it.room + ' ' : ''}${head} ${tail}`.trim();
 };
-const itemsText = (items) => items.map(it => '• ' + itemLine(it)).join('\n');
+// รายการแบบเดียวกับปุ่มคัดลอกในเว็บ (📍ห้อง · ฝั่งดึง · ผ้าโปร่ง · ราคา) — เว็บจัดรูปแบบให้ที่ /api/item-lines (lib/orderPrint.ts ที่เดียว)
+// เรียก prettify() ก่อนสร้างข้อความ แล้ว itemsText() หยิบจากแคช · เว็บล่ม = ใช้บรรทัดสั้นแบบเดิม
+const pretty = new Map();
+const itemsKey = (items) => JSON.stringify(items);
+async function prettify(lists) {
+  const todo = [...new Set(lists.filter(l => Array.isArray(l) && l.length).map(itemsKey))].filter(k => !pretty.has(k));
+  if (!todo.length) return;
+  try {
+    const res = await fetch(`${WEB_URL}/api/item-lines`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-bot-key': process.env.BOT_API_KEY || '', Cookie: webCookie() },
+      body: JSON.stringify({ orders: todo.map(k => ({ items: JSON.parse(k), is_installation: true })) }),
+    });
+    const j = await res.json();
+    if (pretty.size > 300) pretty.clear();
+    if (Array.isArray(j.texts)) todo.forEach((k, i) => { if (j.texts[i]) pretty.set(k, j.texts[i]); });
+  } catch (err) { console.error('item-lines:', err.message || err); }
+}
+const itemsText = (items) => pretty.get(itemsKey(items)) || items.map(it => '• ' + itemLine(it)).join('\n');
 
 const NEW_SYSTEM = () => `คุณอ่านข้อความนัดงานติดตั้งผ้าม่านที่แอดมินร้าน Donna Design พิมพ์ แล้วตอบเป็น JSON อย่างเดียว ห้ามมีคำอื่น
 วันนี้คือ ${bkkToday()} (ปี ค.ศ. · ถ้าเขียนปี พ.ศ. เช่น 2569 ให้ลบ 543 · ถ้าไม่ระบุปีให้ใช้วันที่ที่ใกล้วันนี้ที่สุดที่ยังไม่ผ่านไป)
@@ -294,6 +312,7 @@ async function handleNew(ctx, replyToken, text) {
     const same = q ? await findJobs(ctx.supabase, q, profile) : [];
     if (same.length) dup = same.slice(0, 3).map(jobLabel).join('\n') + '\nถ้าเป็นงานเดียวกัน กด "แก้" แล้วใช้ #แก้ แทน';
   } catch (err) { console.error('appt dup check:', err.message || err); }
+  await prettify([a.items]);
   const rows = [
     ['งาน', a.work_type], ['ช่องทาง', a.platform], ['วันนัด', whenText(a.date, a.time) + (past ? ' · วันนี้ผ่านไปแล้ว' : ''), past ? 'warn' : whenTone(a.date)], ['ลูกค้า', a.customer_id], ['ชื่อจริง', a.customer_real_name],
     ['เบอร์', a.phone], ['ที่อยู่', a.address], ['แผนที่', a.location_link], a.install_zone ? ['โซน', a.install_zone + zoneNote] : ['โซน', 'ไม่รู้โซน', 'warn'],
@@ -421,6 +440,7 @@ async function handleAddItems(ctx, replyToken, text) {
   if (!query || !body) return reply(client, replyToken, 'พิมพ์ #เพิ่มรายการ ตามด้วยชื่อลูกค้าในบรรทัดแรก แล้วขึ้นบรรทัดใหม่ใส่รายการ เช่น\n#เพิ่มรายการ Line OA : Test\nม่านลอนเทป\nS581 ขาวครีม\n1.84*2.78 = 2ผืน ฿3,681');
   const [jobs, items] = await Promise.all([findJobs(supabase, query, profile), parseItems(body)]);
   if (!items.length) return reply(client, replyToken, 'อ่านรายการสินค้าไม่ออก ลองพิมพ์ใหม่อีกทีนะคะ');
+  await prettify([items]);
   if (!jobs.length) return reply(client, replyToken, `ไม่เจองานที่ยังไม่เสร็จของ "${query}" ในปฏิทินงานติดตั้ง\nลองค้นด้วยเบอร์ หรือเลข IN แทนได้ค่ะ`);
   if (jobs.length === 1) {
     const t = keep({ kind: 'items', job: jobs[0], items });
@@ -504,6 +524,7 @@ async function handleEditItems(ctx, replyToken, text) {
   if (!query || !body) return reply(client, replyToken, 'แก้รายการ: พิมพ์ #แก้ ตามด้วยชื่อลูกค้าในบรรทัดแรก แล้วขึ้นบรรทัดใหม่ใส่รายการที่แก้ (ชนิดและขนาดเดียวกับของเดิม) เช่น\n#แก้ Line OA : Test\nม่านลอนเทป\nS01 ครีมมินิมอล\n1.84*2.78 = 2ผืน (ใส่โซ่ถ่วง)');
   const [jobs, items] = await Promise.all([findJobs(supabase, query, profile), parseItems(body)]);
   if (!items.length) return reply(client, replyToken, 'อ่านรายการสินค้าไม่ออก ลองพิมพ์ใหม่อีกทีนะคะ');
+  await prettify([items]);
   if (!jobs.length) return reply(client, replyToken, `ไม่เจองานที่ยังไม่เสร็จของ "${query}" ในปฏิทินงานติดตั้ง\nลองค้นด้วยเบอร์ หรือเลข IN แทนได้ค่ะ`);
   if (jobs.length === 1) {
     const r = await editItemsCard(supabase, jobs[0], items, edit);
@@ -585,6 +606,7 @@ async function handleDay(ctx, replyToken, offset, text) {
   const word = offset === 0 ? 'วันนี้' : 'พรุ่งนี้';
   if (!rows.length) return reply(client, replyToken, `${word} (${thaiDayLabel(day)}) ไม่มีงาน${zone ? 'ในโซน' + zone : ''}ค่ะ`);
   const orders = await ordersOf(supabase, rows.map(r => r.source_order_id));
+  await prettify(Object.values(orders).map(o => o.items));
   const parts = rows.map(r => {
     const { time } = toBkk(r.appointment_datetime);
     const z = zoneOf(r);
@@ -595,7 +617,7 @@ async function handleDay(ctx, replyToken, offset, text) {
     if (r.location_link) lines.push(r.location_link);
     if (r.notes) lines.push(`*${r.notes}*`);
     const items = (orders[r.source_order_id] || {}).items;
-    if (Array.isArray(items) && items.length) lines.push('รายการ:', itemsText(items));
+    if (Array.isArray(items) && items.length) lines.push('', itemsText(items));
     return lines.join('\n');
   });
   const head = `📅 งาน${word} ${thaiDayLabel(day)}${zone ? ' #' + zone : ' (ทุกโซน)'} · ${rows.length} งาน`;
@@ -624,6 +646,7 @@ async function viewCard(supabase, job) {
   const o = job.source_order_id ? (await ordersOf(supabase, [job.source_order_id]))[job.source_order_id] : null;
   const { date, time } = toBkk(job.appointment_datetime);
   const items = o && Array.isArray(o.items) ? o.items : [];
+  await prettify([items]);
   const remain = o ? remainOf(o) : null;
   return card(jobLabel(job), [
     ['งาน', job.work_type], ['สถานะ', job.installation_status], ['วันนัด', whenText(date, time), whenTone(date)],
