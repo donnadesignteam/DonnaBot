@@ -529,6 +529,154 @@ async function saveEditItems(supabase, job, items) {
   return changes;
 }
 
+// ── #วิธีใช้ ──
+const HELP = `📖 วิธีใช้บอท
+
+🔍 ดูงาน
+#วันนี้  งานวันนี้
+#พรุ่งนี้  งานพรุ่งนี้
+#ดู ชื่อลูกค้า  ดูงานละเอียด
+#สรุป  งานที่ยังไม่เสร็จ
+#ปฏิทิน  รูปปฏิทินเดือนนี้
+
+📅 ลง / แก้งาน
+#นัด  ลงนัดใหม่
+#แก้ ชื่อลูกค้า  แก้วัน เวลา เบอร์ หรือรายการ
+#เพิ่มรายการ ชื่อลูกค้า  เพิ่มรายการสินค้า
+#ยกเลิก ชื่อลูกค้า  ยกเลิกนัด
+
+📍 ดูเฉพาะโซน: ต่อท้ายชื่อโซน
+เช่น #สรุปเชียงราย  #พรุ่งนี้กทม  #ปฏิทินเชียงใหม่
+
+💡 ชื่อลูกค้าใช้ชื่อไลน์ เบอร์ หรือเลข IN ก็ได้
+💡 ก่อนบันทึกจะมีการ์ดให้กดยืนยันทุกครั้ง`;
+
+// ใบออเดอร์คู่ของงาน (รายการ + ยอดเงิน) — คืน map id → แถว
+async function ordersOf(supabase, ids) {
+  const list = [...new Set(ids.filter(Boolean))];
+  if (!list.length) return {};
+  const { data, error } = await supabase.from('order_entries').select('id, items, price, payment_status, paid_amount, deposit, order_status').in('id', list);
+  if (error) throw error;
+  return Object.fromEntries((data || []).map(o => [o.id, o]));
+}
+// เหลือชำระ — กติกาเดียวกับ payOf ใน lib/orderMoney.ts ของเว็บ
+function remainOf(o) {
+  const n = (v) => (v == null || v === '' || isNaN(Number(v)) ? null : Number(v));
+  const price = n(o.price), st = o.payment_status || 'ยังไม่ชำระ';
+  if (st === 'ชำระครบ') return 0;
+  if (st === 'ยังไม่ชำระ') return price;
+  const paid = n(o.paid_amount) ?? (st === 'มัดจำ50%' && price != null ? price / 2 : null);
+  return paid != null && price != null ? Math.max(0, price - paid) : n(o.deposit);
+}
+const baht = (v) => Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 });
+const kindLabel = (r) => (r.work_type === 'งานวัดหน้างาน' ? 'วัดหน้างาน' : r.work_type === 'งานแก้' ? 'แก้งาน' : 'ติดตั้ง');
+
+// ── #วันนี้ / #พรุ่งนี้ [โซน] ── งานของวันนั้นเรียงตามเวลา พร้อมรายการสินค้า (อ่านอย่างเดียว)
+async function handleDay(ctx, replyToken, offset, text) {
+  const { client, supabase } = ctx;
+  const zone = ZONES.find(z => text.includes(z)) || '';
+  const day = new Date(Date.parse(bkkToday() + 'T00:00:00Z') + offset * 86400e3).toISOString().slice(0, 10);
+  const from = new Date(`${day}T00:00:00+07:00`).toISOString(), to = new Date(Date.parse(from) + 86400e3).toISOString();
+  const { data, error } = await supabase.from('installations')
+    .select('serial_no, appointment_datetime, work_type, customer_id, customer_real_name, phone, province, install_zone, location_link, notes, installation_status, source_order_id')
+    .gte('appointment_datetime', from).lt('appointment_datetime', to).order('appointment_datetime', { ascending: true });
+  if (error) throw error;
+  const rows = (data || []).filter(r => !zone || zoneOf(r) === zone || !zoneOf(r));
+  const word = offset === 0 ? 'วันนี้' : 'พรุ่งนี้';
+  if (!rows.length) return reply(client, replyToken, `${word} (${thaiDayLabel(day)}) ไม่มีงาน${zone ? 'ในโซน' + zone : ''}ค่ะ`);
+  const orders = await ordersOf(supabase, rows.map(r => r.source_order_id));
+  const parts = rows.map(r => {
+    const { time } = toBkk(r.appointment_datetime);
+    const z = zoneOf(r);
+    const lines = [`⏰ ${time} น. ${kindLabel(r)}${z ? ' · #' + z : ' · ยังไม่ระบุโซน'}${DONE.includes(r.installation_status) ? ' ✅' + r.installation_status : ''}`];
+    if (r.customer_id) lines.push(`LineOA : ${r.customer_id}`);
+    if (r.customer_real_name || r.phone) lines.push(`${r.customer_real_name ? 'คุณ ' + r.customer_real_name + ' ' : ''}${r.phone ? 'โทร ' + r.phone : ''}`.trim());
+    if (r.province) lines.push(r.province);
+    if (r.location_link) lines.push(r.location_link);
+    if (r.notes) lines.push(`*${r.notes}*`);
+    const items = (orders[r.source_order_id] || {}).items;
+    if (Array.isArray(items) && items.length) lines.push('รายการ:', itemsText(items));
+    return lines.join('\n');
+  });
+  const head = `📅 งาน${word} ${thaiDayLabel(day)}${zone ? ' #' + zone : ' (ทุกโซน)'} · ${rows.length} งาน`;
+  // ข้อความ LINE ยาวได้ 5,000 ตัว ตอบได้ทีละ 5 ข้อความ — ตัดที่รอยต่องาน
+  const msgs = [];
+  let cur = head;
+  for (const p of parts) {
+    const add = '\n______________________\n' + p;
+    if (cur.length + add.length > 4900) { msgs.push(cur); cur = p; } else cur += add;
+  }
+  msgs.push(cur);
+  await client.replyMessage({ replyToken, messages: msgs.slice(0, 5).map(t => ({ type: 'text', text: t })) });
+}
+
+// หางานจากชื่อ/เบอร์/IN สำหรับ #ดู / #ยกเลิก — งานที่ยังไม่เสร็จก่อน ไม่เจอค่อยหางานที่ปิดแล้ว (#ดู เท่านั้น)
+const cleanQuery = (t) => String(t || '').split('\n')[0].replace(/^\s*(line\s*-?\s*oa|ไลน์\s*โอเอ|facebook|fb|เฟส\S*|tiktok\S*|shopee\S*|ช้อปปี้)\s*[:：]?\s*/i, '').trim();
+function pickCard(title, query, jobs, t) {
+  const msg = card(title, [['ค้นด้วย', query]], [], C.dark);
+  msg.contents.footer = { type: 'box', layout: 'vertical', spacing: 'sm', backgroundColor: C.surface, paddingAll: '12px',
+    contents: jobs.slice(0, 4).map((j, i) => btn(shortLabel(j), `appt:pick:${t}:${i}`, '', jobLabel(j))) };
+  return msg;
+}
+
+// ── #ดู <ลูกค้า> ── การ์ดงานเดียวแบบละเอียด (อ่านอย่างเดียว)
+async function viewCard(supabase, job) {
+  const o = job.source_order_id ? (await ordersOf(supabase, [job.source_order_id]))[job.source_order_id] : null;
+  const { date, time } = toBkk(job.appointment_datetime);
+  const items = o && Array.isArray(o.items) ? o.items : [];
+  const remain = o ? remainOf(o) : null;
+  return card(jobLabel(job), [
+    ['งาน', job.work_type], ['สถานะ', job.installation_status], ['วันนัด', whenText(date, time), whenTone(date)],
+    ['ลูกค้า', job.customer_id], ['ชื่อจริง', job.customer_real_name], ['เบอร์', job.phone], ['ที่อยู่', job.province],
+    ['แผนที่', job.location_link], ['โซน', zoneOf(job) || 'ยังไม่ระบุ'], ['หมายเหตุ', job.notes],
+    ['รายการ', items.length ? itemsText(items) : (o ? 'ยังไม่มีรายการ' : '')],
+    ['ยอดรวม', o && o.price != null ? baht(o.price) + ' บาท' : ''],
+    ['เหลือชำระ', o && remain != null ? (remain === 0 ? 'ชำระครบแล้ว' : baht(remain) + ' บาท') : '', remain ? 'warn' : ''],
+  ], webBtn(job.id), C.dark);
+}
+async function handleView(ctx, replyToken, text) {
+  const { client, supabase, profile } = ctx;
+  const query = cleanQuery(text);
+  if (!query) return reply(client, replyToken, 'พิมพ์ #ดู ตามด้วยชื่อลูกค้า เบอร์ หรือเลข IN เช่น #ดู Test');
+  let jobs = await findJobs(supabase, query, profile);
+  if (!jobs.length) jobs = await findJobs(supabase, query, profile, { done: true });
+  if (!jobs.length) return reply(client, replyToken, `ไม่เจองานของ "${query}" ในปฏิทินงานติดตั้ง\nลองค้นด้วยเบอร์ หรือเลข IN แทนได้ค่ะ`);
+  if (jobs.length === 1) return client.replyMessage({ replyToken, messages: [await viewCard(supabase, jobs[0])] });
+  const t = keep({ kind: 'pickview', jobs: jobs.slice(0, 4) });
+  return client.replyMessage({ replyToken, messages: [pickCard(`เจอ ${jobs.length} งาน — เลือกงานที่จะดู`, query, jobs, t)] });
+}
+
+// ── #ยกเลิก <ลูกค้า> ── แบบเดียวกับปุ่มลบในหน้าปฏิทินงานติดตั้งของเว็บ: ลบแถวออกจากปฏิทิน
+//    ใบออเดอร์คู่ไม่ลบ แค่เปลี่ยนเป็น "ยกเลิก" (ยังค้นดูย้อนหลังได้ในหมวดออเดอร์ แท็บยกเลิก)
+function cancelCard(job, t) {
+  return card('ยกเลิกนัด' + TAG, [['ใบงาน', jobLabel(job)], ['ลูกค้า', job.customer_id || job.customer_real_name],
+    ['จะทำ', 'ลบงานนี้ออกจากปฏิทินงานติดตั้ง' + (job.source_order_id ? '\nใบออเดอร์คู่เปลี่ยนเป็น "ยกเลิก" (ไม่ลบ)' : ''), 'warn']],
+    [['ยืนยันยกเลิก', `appt:ok:${t}`, 'primary'], ['ไม่ยกเลิก', `appt:edit:${t}`]], C.dark);
+}
+async function handleCancel(ctx, replyToken, text) {
+  const { client, supabase, profile } = ctx;
+  const query = cleanQuery(text);
+  if (!query) return reply(client, replyToken, 'พิมพ์ #ยกเลิก ตามด้วยชื่อลูกค้า เบอร์ หรือเลข IN เช่น #ยกเลิก IN0178');
+  const jobs = await findJobs(supabase, query, profile);
+  if (!jobs.length) return reply(client, replyToken, `ไม่เจองานที่ยังไม่เสร็จของ "${query}" ในปฏิทินงานติดตั้ง\nลองค้นด้วยเบอร์ หรือเลข IN แทนได้ค่ะ`);
+  if (jobs.length === 1) return client.replyMessage({ replyToken, messages: [cancelCard(jobs[0], keep({ kind: 'cancel', job: jobs[0] }))] });
+  const t = keep({ kind: 'pickcancel', jobs: jobs.slice(0, 4) });
+  return client.replyMessage({ replyToken, messages: [pickCard(`เจอ ${jobs.length} งาน — เลือกงานที่จะยกเลิก`, query, jobs, t)] });
+}
+async function saveCancel(supabase, job) {
+  const { data: cur, error } = await supabase.from('installations').select('*').eq('id', job.id).maybeSingle();
+  if (error) throw error;
+  if (!cur) throw new Error('งานนี้ถูกลบออกจากเว็บไปแล้ว');
+  console.log('appt cancel backup:', JSON.stringify(cur));   // เก็บแถวเดิมไว้ใน log ของ Railway เผื่อต้องกู้
+  const now = new Date().toISOString();
+  if (cur.source_order_id) {
+    const { error: e1 } = await supabase.from('order_entries').update({ order_status: 'ยกเลิก', updated_at: now, ...BOT }).eq('id', cur.source_order_id);
+    if (e1) throw e1;
+  }
+  const { error: e2 } = await supabase.from('installations').delete().eq('id', cur.id);
+  if (e2) throw e2;
+}
+
 // ── #สรุป ── (อ่านอย่างเดียว · หน้าตาเหมือนโพสต์ "🔥อัพเดตงานติดตั้ง" ของทีม)
 async function handleSummary(ctx, replyToken, text) {
   const { client, supabase, profile } = ctx;
@@ -743,6 +891,7 @@ async function handlePostback(ctx, replyToken, data) {
   if (!p) return reply(client, replyToken, 'การ์ดนี้หมดอายุแล้ว');
   if (act === 'edit') {
     pending.delete(t);
+    if (p.kind === 'cancel') return reply(client, replyToken, 'ไม่ยกเลิกแล้วค่ะ งานยังอยู่ในปฏิทินเหมือนเดิม');
     return reply(client, replyToken, p.kind === 'new'
       ? 'ยกเลิกการ์ดนี้แล้ว พิมพ์ #นัด ใหม่พร้อมข้อมูลที่ถูกต้องได้เลยค่ะ'
       : /edititems/.test(p.kind) ? 'ยกเลิกการ์ดนี้แล้ว พิมพ์ #แก้ ใหม่ได้เลยค่ะ'
@@ -753,6 +902,8 @@ async function handlePostback(ctx, replyToken, data) {
     const job = p.jobs[Number(idx)];
     if (!job) return reply(client, replyToken, 'ไม่เจองานที่เลือก ลองพิมพ์ #แก้ ใหม่นะคะ');
     pending.delete(t);
+    if (p.kind === 'pickview') { pending.delete(t); return send(await viewCard(supabase, job)); }
+    if (p.kind === 'pickcancel') return send(cancelCard(job, keep({ kind: 'cancel', job })));
     if (p.kind === 'pickedititems') {
       const r = await editItemsCard(supabase, job, p.items, p.edit);
       return r.msg ? send(r.msg) : reply(client, replyToken, r.text);
@@ -767,6 +918,12 @@ async function handlePostback(ctx, replyToken, data) {
   }
   if (act === 'ok') {
     pending.delete(t);   // ลบก่อนบันทึก — กดยืนยันซ้ำสองทีไม่ได้แถวซ้ำ
+    if (p.kind === 'cancel') {
+      const what = [['ใบงาน', jobLabel(p.job)], ['ลูกค้า', p.job.customer_id || p.job.customer_real_name]];
+      if (DRY_RUN) return send(card('ทดสอบ · ยังไม่ยกเลิกในเว็บ', what, [], C.mute));
+      await saveCancel(supabase, p.job);
+      return send(card('ยกเลิกนัดแล้ว', [...what, ['ใบออเดอร์', p.job.source_order_id ? 'เปลี่ยนเป็น "ยกเลิก" แล้ว' : '']], [], C.done));
+    }
     if (p.kind === 'edititems') {
       if (DRY_RUN) return send(card('ทดสอบ · ยังไม่แก้ในเว็บ', [['ใบงาน', jobLabel(p.job)], ['รายการ', itemsText(p.items)]], webBtn(p.job.id), C.mute));
       // แก้ช่องอื่นก่อน (วันเวลา/เบอร์…) แล้วค่อยแก้รายการ
@@ -814,10 +971,14 @@ async function reply(client, replyToken, text) {
 // ข้อความขึ้นต้นด้วยคำสั่งไหม → จัดการแล้วคืน true
 async function handleApptText(ctx, replyToken, text, profileKey) {
   ctx = { ...ctx, profile: PROFILES[profileKey] || null };
-  const m = text.match(/^#\s*(เพิ่มรายการ|นัด|แก้|เลื่อน|สรุป|ปฏิทิน)\s*([\s\S]*)$/);
+  const m = text.match(/^#\s*(วิธีใช้|ช่วย|วันนี้|พรุ่งนี้|ดู|ยกเลิก|เพิ่มรายการ|นัด|แก้|เลื่อน|สรุป|ปฏิทิน)\s*([\s\S]*)$/);
   if (!m) return false;
   try {
-    if (m[1] === 'นัด') await handleNew(ctx, replyToken, m[2].trim());
+    if (m[1] === 'วิธีใช้' || m[1] === 'ช่วย') await reply(ctx.client, replyToken, HELP);
+    else if (m[1] === 'วันนี้' || m[1] === 'พรุ่งนี้') await handleDay(ctx, replyToken, m[1] === 'วันนี้' ? 0 : 1, m[2].trim());
+    else if (m[1] === 'ดู') await handleView(ctx, replyToken, m[2].trim());
+    else if (m[1] === 'ยกเลิก') await handleCancel(ctx, replyToken, m[2].trim());
+    else if (m[1] === 'นัด') await handleNew(ctx, replyToken, m[2].trim());
     else if (m[1] === 'เพิ่มรายการ') await handleAddItems(ctx, replyToken, m[2].trim());
     else if ((m[1] === 'แก้' || m[1] === 'เลื่อน') && hasItems(m[2])) await handleEditItems(ctx, replyToken, m[2].trim());   // มีรายการสินค้า = แก้รายการ
     else if (m[1] === 'แก้' || m[1] === 'เลื่อน') await handleEdit(ctx, replyToken, m[2].trim());   // #เลื่อน = ชื่อเดิม ทำงานเหมือน #แก้
