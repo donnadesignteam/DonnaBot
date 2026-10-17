@@ -452,13 +452,18 @@ async function saveItems(supabase, job, items) {
   return '';
 }
 
-// ── #แก้ + รายการสินค้า ── แทนรายการเดิมที่ "ชนิด + กว้าง + สูง" เดียวกัน (เช่นเปลี่ยนสี/โซ่ถ่วง) · ไม่เจอตัวที่ตรง = เพิ่มเป็นรายการใหม่
+// ── #แก้ + รายการสินค้า ── แทนรายการเดิม: ชนิด+กว้าง+สูง ตรงกันก่อน (เปลี่ยนสี/โซ่ถ่วง) → ไม่ตรง = ชนิดเดียวกันที่ขนาดใกล้สุด (เปลี่ยนขนาด)
+// ไม่มีชนิดนั้นในใบเลย = เพิ่มใหม่ · #แก้ เน้นแก้ ถ้าจะเพิ่มรายการชนิดเดิมอีกชุดให้ใช้ #เพิ่มรายการ (17ต.ค.69 user ขอ)
 const sameSize = (a, b) => String(a.type || '') === String(b.type || '')
   && Number(a.width || 0) === Number(b.width || 0) && Number(a.height || 0) === Number(b.height || 0);
 function mergeItems(old, items) {
   const next = [...old], changes = [], used = new Set();
   for (const it of items) {
-    const i = next.findIndex((o, k) => !used.has(k) && sameSize(o, it));
+    let i = next.findIndex((o, k) => !used.has(k) && sameSize(o, it));
+    if (i < 0) {
+      const dist = (o) => Math.abs(Number(o.width || 0) - Number(it.width || 0)) + Math.abs(Number(o.height || 0) - Number(it.height || 0));
+      next.forEach((o, k) => { if (!used.has(k) && String(o.type || '') === String(it.type || '') && (i < 0 || dist(o) < dist(next[i]))) i = k; });
+    }
     if (i >= 0) {
       used.add(i);
       changes.push({ was: next[i], now: it });
@@ -475,28 +480,36 @@ async function orderItemsOf(supabase, job) {
   if (error) throw error;
   return data ? (Array.isArray(data.items) ? data.items : []) : null;
 }
-async function editItemsCard(supabase, job, items) {
+async function editItemsCard(supabase, job, items, edit) {
   const old = await orderItemsOf(supabase, job);
   if (old == null) return { text: `${jobLabel(job)} ไม่มีใบออเดอร์คู่ (แก้รายการได้เฉพาะงานติดตั้ง) — ถ้าจะเพิ่มรายการใช้ #เพิ่มรายการ ค่ะ` };
   const { changes } = mergeItems(old, items);
-  const t = keep({ kind: 'edititems', job, items });
-  return { msg: card('แก้รายการ' + TAG, [['ใบงาน', jobLabel(job)], ['รายการ', changesText(changes)]],
+  const withFields = edit && Object.keys(edit.changes || {}).length && hasChange(job, edit) ? edit : null;
+  const t = keep({ kind: 'edititems', job, items, edit: withFields });
+  // ช่องอื่นที่แก้พร้อมกัน (วัน/เวลา/เบอร์…) ใช้แถวเดียวกับการ์ด #แก้ ปกติ
+  const fieldRows = withFields ? editCard(job, withFields, t).contents.body.contents.slice(1).map(b => [b.contents[0].text, b.contents[1].text]) : [];
+  return { msg: card('แก้ไขงาน' + TAG, [['ใบงาน', jobLabel(job)], ...fieldRows, ['รายการ', changesText(changes)]],
     [['ยืนยัน', `appt:ok:${t}`, 'primary'], ['ยกเลิก', `appt:edit:${t}`]], C.dark) };
 }
 async function handleEditItems(ctx, replyToken, text) {
-  const { client, supabase, profile } = ctx;
+  const { client, supabase, profile, anthropic } = ctx;
+  // ส่วนที่ไม่ใช่รายการ (วัน เวลา เบอร์ ฯลฯ) อ่านด้วยตัวเดียวกับ #แก้ ปกติ → แก้พร้อมกันในการ์ดเดียว
+  const ai = await askJson(anthropic, EDIT_SYSTEM() + '\n‼️ ข้อความอาจมีรายการสินค้า (ชนิดม่าน รหัสสี ขนาด จำนวน ราคา โซ่ถ่วง) ต่อท้าย — ไม่ใช่ changes ห้ามใส่ใน notes ระบบแก้รายการแยกเอง', text).catch(() => null);
+  const edit = { query: ai && ai.query, notes_mode: ai && ai.notes_mode, changes: Object.fromEntries(Object.entries((ai && ai.changes) || {}).filter(([, v]) => v != null && v !== '')) };
+  sanitize(edit.changes, text, { edit: true });
   const [first, ...rest] = text.split('\n');
   const body = rest.join('\n').trim();
-  const query = first.replace(/^\s*(line\s*-?\s*oa|ไลน์\s*โอเอ|facebook|fb|เฟส\S*|tiktok\S*|shopee\S*|ช้อปปี้)\s*[:：]?\s*/i, '').trim();
+  const query0 = first.replace(/^\s*(line\s*-?\s*oa|ไลน์\s*โอเอ|facebook|fb|เฟส\S*|tiktok\S*|shopee\S*|ช้อปปี้)\s*[:：]?\s*/i, '').trim();
+  const query = edit.query || query0;   // AI แยกชื่อลูกค้าออกจาก "Test เป็น 20/10 10.00" ได้ · AI พัง = ใช้บรรทัดแรก
   if (!query || !body) return reply(client, replyToken, 'แก้รายการ: พิมพ์ #แก้ ตามด้วยชื่อลูกค้าในบรรทัดแรก แล้วขึ้นบรรทัดใหม่ใส่รายการที่แก้ (ชนิดและขนาดเดียวกับของเดิม) เช่น\n#แก้ Line OA : Test\nม่านลอนเทป\nS01 ครีมมินิมอล\n1.84*2.78 = 2ผืน (ใส่โซ่ถ่วง)');
   const [jobs, items] = await Promise.all([findJobs(supabase, query, profile), parseItems(body)]);
   if (!items.length) return reply(client, replyToken, 'อ่านรายการสินค้าไม่ออก ลองพิมพ์ใหม่อีกทีนะคะ');
   if (!jobs.length) return reply(client, replyToken, `ไม่เจองานที่ยังไม่เสร็จของ "${query}" ในปฏิทินงานติดตั้ง\nลองค้นด้วยเบอร์ หรือเลข IN แทนได้ค่ะ`);
   if (jobs.length === 1) {
-    const r = await editItemsCard(supabase, jobs[0], items);
+    const r = await editItemsCard(supabase, jobs[0], items, edit);
     return r.msg ? client.replyMessage({ replyToken, messages: [r.msg] }) : reply(client, replyToken, r.text);
   }
-  const t = keep({ kind: 'pickedititems', jobs: jobs.slice(0, 4), items });
+  const t = keep({ kind: 'pickedititems', jobs: jobs.slice(0, 4), items, edit });
   const msg = card(`เจอ ${jobs.length} งาน — เลือกงานที่จะแก้รายการ`, [['ค้นด้วย', query], ['รายการ', itemsText(items)]], [], C.dark);
   msg.contents.footer = { type: 'box', layout: 'vertical', spacing: 'sm', backgroundColor: C.surface, paddingAll: '12px',
     contents: jobs.slice(0, 4).map((j, i) => btn(shortLabel(j), `appt:pick:${t}:${i}`, '', jobLabel(j))) };
@@ -740,7 +753,7 @@ async function handlePostback(ctx, replyToken, data) {
     if (!job) return reply(client, replyToken, 'ไม่เจองานที่เลือก ลองพิมพ์ #แก้ ใหม่นะคะ');
     pending.delete(t);
     if (p.kind === 'pickedititems') {
-      const r = await editItemsCard(supabase, job, p.items);
+      const r = await editItemsCard(supabase, job, p.items, p.edit);
       return r.msg ? send(r.msg) : reply(client, replyToken, r.text);
     }
     if (p.kind === 'pickitems') {
@@ -755,8 +768,17 @@ async function handlePostback(ctx, replyToken, data) {
     pending.delete(t);   // ลบก่อนบันทึก — กดยืนยันซ้ำสองทีไม่ได้แถวซ้ำ
     if (p.kind === 'edititems') {
       if (DRY_RUN) return send(card('ทดสอบ · ยังไม่แก้ในเว็บ', [['ใบงาน', jobLabel(p.job)], ['รายการ', itemsText(p.items)]], webBtn(p.job.id), C.mute));
+      // แก้ช่องอื่นก่อน (วันเวลา/เบอร์…) แล้วค่อยแก้รายการ
+      let warn = '';
+      const fields = [];
+      if (p.edit) {
+        const c = p.edit.changes || {}, after = applyEdit(p.job, p.edit), old = toBkk(p.job.appointment_datetime);
+        if ((c.date && c.date !== old.date) || (c.time && c.time !== old.time)) fields.push(['วันนัด', whenText(after.date, after.time), whenTone(after.date)]);
+        for (const [f, label] of EDIT_FIELDS) if (after[f] !== undefined) fields.push([label, f === 'notes' && p.edit.notes_mode !== 'replace' && p.job.notes ? '(ต่อท้าย) ' + c.notes : after[f]]);
+        warn = (await saveEdit(supabase, p.job, p.edit)).warn;
+      }
       const changes = await saveEditItems(supabase, p.job, p.items);
-      return send(card('แก้รายการในเว็บแล้ว', [['ใบงาน', jobLabel(p.job)], ['รายการ', changesText(changes)]], webBtn(p.job.id), C.done));
+      return send(card('แก้ในเว็บแล้ว', [['ใบงาน', jobLabel(p.job)], ...fields, ['รายการ', changesText(changes)], ['ต้องดู', warn, 'warn']], webBtn(p.job.id), C.done));
     }
     if (p.kind === 'items') {
       const what = [['ใบงาน', jobLabel(p.job)], ['เพิ่ม', itemsText(p.items)]];
