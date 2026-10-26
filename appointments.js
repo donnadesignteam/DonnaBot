@@ -227,7 +227,8 @@ function trustedDate(aiDate, text) {
   const pair = datePairs(text).find(p => p.d === ad && p.mo === am);
   if (pair) {
     const today = bkkToday(), y0 = +today.slice(0, 4);
-    let y = pair.y; if (y) { if (y < 100) y += 2500; if (y > 2400) y -= 543; }
+    // ปี 2 หลัก: 50–99 = พ.ศ. (69 → 2569) · 00–49 = ค.ศ. (26 → 2026) — 26ต.ค.69 แอดมินพิมพ์ 13/11/26 แล้ววันหาย (เดิมคิดเป็น 2526 = 1983)
+    let y = pair.y; if (y) { if (y < 100) y += y >= 50 ? 2500 : 2000; if (y > 2400) y -= 543; }
     const mk = (yy) => `${yy}-${String(am).padStart(2, '0')}-${String(ad).padStart(2, '0')}`;
     const out = y ? mk(y) : (mk(y0) >= today ? mk(y0) : mk(y0 + 1));
     return validDate(out) && new Date(out + 'T00:00:00Z').getUTCDate() === ad ? out : '';
